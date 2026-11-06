@@ -1,0 +1,296 @@
+[
+  {
+    "word": "önözlem",
+    "definition": "Yaşanmakta olan güzel bir anı, biteceğini bilerek şimdiden özleme hissi",
+    "parts": "ön (önce gelen) + özlem",
+    "sentence": "Tatilin son akşamında denize bakarken içimi bir önözlem kapladı.",
+    "category": "duygu",
+    "field": "his",
+    "also_accepted": [
+      "Güzel bir şey bitmeden onu özlemek",
+      "Mutlu bir anın sona ereceğini düşünüp hüzünlenmek",
+      "Henüz yaşarken bir anı özlemeye başlamak"
+    ],
+    "wrong_meanings": [
+      "Geçmişte kalmış güzel günleri özleme hissi",
+      "Gelecekte olacak bir şeyi sabırsızlıkla bekleme hissi",
+      "Hiçbir şeyi özlememe hali",
+      "Birini ya da bir şeyi özlemek",
+      "Bir şeyin biteceğini bilmek"
+    ]
+  },
+  {
+    "word": "sıyırgaç",
+    "definition": "Tabakta kalan sosu sıyırmak için kullanılan ekmek parçası",
+    "parts": "sıyır- (fiil kökü) + -gaç (süzgeç, yüzgeç gibi araç adları yapan ek)",
+    "sentence": "Menemenin son lokmasını sıyırgaçla tabaktan topladı.",
+    "category": "nesne",
+    "field": "yemek",
+    "also_accepted": [
+      "Sosu silmeye yarayan ekmek lokması",
+      "Yemeğin sosuna banılan ekmek",
+      "Tabağı temizlemek için kullanılan ekmek"
+    ],
+    "wrong_meanings": [
+      "Tencerenin dibini kazımak için kullanılan mutfak aleti",
+      "Bulaşık yıkarken kullanılan sünger",
+      "Yüzeydeki boyayı kazıyan alet",
+      "Yemek yemeye yarayan çatal ve kaşık",
+      "Fırında pişirilen ekmek"
+    ]
+  },
+  {
+    "word": "sorusavar",
+    "definition": "Gazetecilerin sorularını yanıtlamadan ustaca geçiştiren siyasetçi",
+    "parts": "soru + savar (uçaksavar, tanksavar gibi savuşturan)",
+    "sentence": "Basın toplantısında yirmi soru geldi, sorusavar başkandan tek cevap çıkmadı.",
+    "category": "kişi",
+    "field": "siyaset",
+    "also_accepted": [
+      "Sorulara cevap vermekten kaçan siyasetçi",
+      "Soruları geçiştiren politikacı",
+      "Soruları lafı dolandırarak savuşturan kişi",
+      "Zor sorulardan sıyrılmayı bilen politikacı"
+    ],
+    "wrong_meanings": [
+      "Her şeyi sorgulayan meraklı kişi",
+      "Sorulan her soruyu açıkça yanıtlayan siyasetçi",
+      "Sınav sorularını hazırlayan kişi",
+      "Haber yazan gazeteci",
+      "Soru sormayı sevmeyen kişi"
+    ]
+  },
+  {
+    "word": "kökağı",
+    "definition": "Ormandaki ağaçların kökleri ve mantarlar aracılığıyla besin paylaştığı yeraltı ağı",
+    "parts": "kök + ağ + -ı",
+    "sentence": "Yaşlı meşe, kökağı sayesinde gölgedeki fidanlara şeker gönderir.",
+    "category": "doğal sistem",
+    "field": "bilim",
+    "also_accepted": [
+      "Ağaçların yer altında köklerle birbirine bağlandığı ağ",
+      "Bitkilerin mantarlar sayesinde yer altında haberleştiği sistem",
+      "Köklerin toprak altında oluşturduğu ağ"
+    ],
+    "wrong_meanings": [
+      "Toprak altında yetişen kök sebzeler",
+      "Bilgisayarların birbirine bağlandığı internet ağı",
+      "Balık tutmak için kullanılan ağ",
+      "Bir ağacın toprak altındaki kökü",
+      "Yer altında yetişen mantarlar"
+    ]
+  },
+  {
+    "word": "duşyanıtı",
+    "definition": "Tartışma bittikten sonra, çok geç olduğunda akla gelen mükemmel cevap",
+    "parts": "duş + yanıt + -ı",
+    "sentence": "Patronla konuşalı üç saat oldu, aklıma şimdi geldi ama artık sadece bir duşyanıtı.",
+    "category": "söz",
+    "field": "his",
+    "also_accepted": [
+      "Tartışmadan sonra akla gelen iyi cevap",
+      "O an söyleyemeyip sonradan akla gelen söz",
+      "Geç akla gelen karşılık"
+    ],
+    "wrong_meanings": [
+      "Duş alırken şarkı söyleme alışkanlığı",
+      "Mesajlara çok hızlı cevap verme",
+      "Tartışma sırasında anında verilen mükemmel cevap",
+      "Duşta düşünüp bulunan yeni fikirler",
+      "Duş alırken gelen telefona cevap vermek"
+    ]
+  },
+  {
+    "word": "hesapgüreşi",
+    "definition": "Restoranda hesabı kimin ödeyeceği konusunda arkadaşlar arasında yaşanan tatlı çekişme",
+    "parts": "hesap + güreş + -i",
+    "sentence": "Kebabın ardından masada yine hesapgüreşi başladı, garson kimi dinleyeceğini şaşırdı.",
+    "category": "davranış",
+    "field": "yemek",
+    "also_accepted": [
+      "Hesabı kimin ödeyeceği konusunda yapılan tartışma",
+      "Arkadaşların hesabı ödemek için birbiriyle yarışması",
+      "Hesabı ben ödeyeceğim diye kavga etmek"
+    ],
+    "wrong_meanings": [
+      "Hesabı arkadaşlar arasında eşit olarak bölüşme",
+      "Hesabı ödemeden restorandan kaçma",
+      "Matematik problemleri çözme yarışması",
+      "Restoranda hesabı ödemek",
+      "Arkadaşlarla restoranda yemek yemek",
+      "Garsonla hesap yüzünden kavga etmek"
+    ]
+  },
+  {
+    "word": "sandıksever",
+    "definition": "Yalnızca seçim dönemlerinde halkın yanında görünen siyasetçi",
+    "parts": "sandık (oy sandığı) + sever",
+    "sentence": "Dört yıldır ortada yoktu, seçim yaklaşınca sandıksever vekil mahalleye geldi.",
+    "category": "kişi",
+    "field": "siyaset",
+    "also_accepted": [
+      "Sadece seçim zamanı halkın yanına gelen siyasetçi",
+      "Seçim yaklaşınca halkı hatırlayan politikacı",
+      "Seçimden seçime ortaya çıkan vekil"
+    ],
+    "wrong_meanings": [
+      "Her seçimde oy kullanmayı seven vatandaş",
+      "Eski sandıkları toplayan kişi",
+      "Seçim olmasa da her zaman halkın arasında olan siyasetçi",
+      "Seçimi kazanmak isteyen aday",
+      "Çeyiz sandığı"
+    ]
+  },
+  {
+    "word": "sürüaklı",
+    "definition": "Tek başına basit olan canlıların birlikte hareket ederken oluşturduğu ortak zeka",
+    "parts": "sürü + akıl + -ı",
+    "sentence": "Karıncaların en kısa yolu bulması sürüaklının en bilinen örneğidir.",
+    "category": "olgu",
+    "field": "bilim",
+    "also_accepted": [
+      "Hayvanların topluca akıllıca davranması",
+      "Kolektif zeka",
+      "Bir topluluğun tek bir akıl gibi hareket etmesi",
+      "Karınca ya da arı gibi canlıların ortak zekası"
+    ],
+    "wrong_meanings": [
+      "Başkalarına uyarak düşünmeden hareket etme",
+      "Hayvan sürülerini otlatan çoban",
+      "Tek başına çok zeki olan kişi",
+      "Hayvan sürüsü",
+      "Araç sürmek",
+      "Zeki hayvan türleri"
+    ]
+  },
+  {
+    "word": "kaydırmaca",
+    "definition": "Telefonda amaçsızca ekranı kaydırarak vakit öldürme alışkanlığı",
+    "parts": "kaydır- + -maca (bulmaca, yanıltmaca gibi)",
+    "sentence": "Yatağa erken girdim ama kaydırmaca yüzünden üçe kadar uyuyamadım.",
+    "category": "alışkanlık",
+    "field": "teknoloji",
+    "also_accepted": [
+      "Telefonda boş boş ekranı kaydırmak",
+      "Sosyal medyada amaçsızca gezinmek",
+      "Ekranda durmadan gezinerek zaman harcamak",
+      "Sosyal medyada kısa videolara dalıp saatler harcamak"
+    ],
+    "wrong_meanings": [
+      "Karda ya da buzda kayarak oynanan çocuk oyunu",
+      "Parkta kaydıraktan kayma",
+      "Telefonu yalnızca gerektiğinde kullanma alışkanlığı",
+      "Telefonla konuşmak",
+      "Bir nesneyi itip başka yere taşımak"
+    ]
+  },
+  {
+    "word": "eşikunutu",
+    "definition": "Bir odaya girince oraya neden geldiğini unutma durumu",
+    "parts": "eşik (kapı eşiği) + unut- + -u",
+    "sentence": "Mutfağın ortasında dikildim kaldım; yine eşikunutu, ne alacaktım ben?",
+    "category": "durum",
+    "field": "his",
+    "also_accepted": [
+      "Bir yere gidince ne için gittiğini unutmak",
+      "Odaya girip neden geldiğini hatırlayamamak",
+      "Kapıdan geçince aklındakini unutmak"
+    ],
+    "wrong_meanings": [
+      "Eşyalarını evde unutma",
+      "Tanıdığı birinin adını hatırlayamama",
+      "Neden geldiğini her zaman hatırlama",
+      "Genel olarak unutkan olmak",
+      "Kapı eşiğinde durmak"
+    ]
+  },
+  {
+    "word": "kuyruktaş",
+    "definition": "Uzun bir sırada yanında bekleyen ve çabucak kaynaştığın yabancı",
+    "parts": "kuyruk + -taş (yoldaş, meslektaş gibi)",
+    "sentence": "Bankada kırk dakika bekleyince kuyruktaşımla bütün hayatımızı konuştuk.",
+    "category": "kişi",
+    "field": "günlük yaşam",
+    "also_accepted": [
+      "Sırada yanında bekleyen kişi",
+      "Aynı kuyrukta beklediğin yabancı",
+      "Kuyrukta sohbet ettiğin kişi"
+    ],
+    "wrong_meanings": [
+      "Sırada beklemeden öne geçen kişi",
+      "Hayvanların kuyruğunda bulunan kemik",
+      "Aynı işyerinde çalışan kişi",
+      "Yolculukta yanında oturan kişi",
+      "Uzun kuyrukta beklemek"
+    ]
+  },
+  {
+    "word": "cepyoklaması",
+    "definition": "Evden çıkmadan önce telefon, cüzdan ve anahtarın yerinde olup olmadığını ceplere dokunarak kontrol etme",
+    "parts": "cep + yokla- + -ma + -sı",
+    "sentence": "Kapıyı çekmeden önce son bir cepyoklaması yaptım, neyse ki eksik yoktu.",
+    "category": "davranış",
+    "field": "günlük yaşam",
+    "also_accepted": [
+      "Evden çıkarken ceplerini kontrol etmek",
+      "Telefon, anahtar ve cüzdanın yanında olup olmadığına bakmak",
+      "Dışarı çıkmadan eşyalarının tam olduğundan emin olmak"
+    ],
+    "wrong_meanings": [
+      "Cepteki parayı sayma",
+      "Öğretmenin sınıfta yoklama alması",
+      "Cep telefonunun faturasını ödeme",
+      "Kaybolan anahtarı aramak",
+      "Cepleri boşaltmak",
+      "Hiçbir şeyi kontrol etmeden evden çıkmak"
+    ]
+  },
+  {
+    "word": "evimsemek",
+    "definition": "Yeni gidilen bir yeri kendi evi gibi hissetmek",
+    "parts": "ev + -im + -se- (benimsemek, önemsemek gibi) + -mek",
+    "sentence": "Üç aydır bu şehirdeyim, küçük mahallemizi yavaş yavaş evimsemeye başladım.",
+    "category": "eylem",
+    "field": "his",
+    "also_accepted": [
+      "Bir yeri ev gibi hissetmek",
+      "Bir yere alışıp orayı yuvası gibi görmek",
+      "Yeni bir mekanı ev gibi sahiplenmek"
+    ],
+    "wrong_meanings": [
+      "Evini temizleyip düzenlemek",
+      "Evden uzaktayken evini özlemek",
+      "Bir yere hiçbir zaman alışamamak",
+      "Yeni bir ev satın almak",
+      "Yeni gidilen bir yerde yabancı hissetmek",
+      "Evi sevmek",
+      "Hiçbir yeri ev gibi hissedememek"
+    ],
+    "inflected_stems": [
+      "evimse"
+    ]
+  },
+  {
+    "word": "oyalanç",
+    "definition": "Asıl yapılması gereken işi ertelemek için sarılınan önemsiz uğraş",
+    "parts": "oyalan- + -ç (sevinç, kazanç, inanç gibi)",
+    "sentence": "Tez yazacağıma yine kalemliği düzenliyorum, bu da benim oyalancım.",
+    "category": "davranış",
+    "field": "günlük yaşam",
+    "also_accepted": [
+      "İşi ertelemek için yapılan gereksiz şey",
+      "Asıl işten kaçmak için oyalanılan küçük meşgale",
+      "Çalışmamak için bulunan önemsiz uğraş"
+    ],
+    "wrong_meanings": [
+      "Çocukları oyalamak için verilen oyuncak",
+      "Boş zamanlarda keyifle yapılan hobi",
+      "İşleri ertelemeden hemen bitirme",
+      "Tembellik etmek",
+      "Boş boş vakit geçirmek"
+    ],
+    "inflected_stems": [
+      "oyalanc"
+    ]
+  }
+]
