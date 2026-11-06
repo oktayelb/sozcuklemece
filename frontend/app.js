@@ -1,0 +1,296 @@
+const LOW_TIME_SECONDS = 30;
+const TICK_MILLISECONDS = 200;
+
+const game = {
+  id: null,
+  durationSeconds: 0,
+  pointsLostPerSecond: 0,
+  hintPenalty: 0,
+  deadline: 0,
+  scoreAtSync: 0,
+  remainingAtSync: 0,
+  timerId: null,
+  isStarting: false,
+  isEnding: false,
+  isSubmitting: false,
+};
+
+function element(id) {
+  return document.getElementById(id);
+}
+
+function showScreen(screenId) {
+  for (const screen of document.querySelectorAll(".screen")) {
+    screen.hidden = screen.id !== screenId;
+  }
+  window.scrollTo(0, 0);
+}
+
+function showError(message) {
+  const banner = element("error-banner");
+  banner.textContent = message;
+  banner.hidden = false;
+}
+
+function clearError() {
+  element("error-banner").hidden = true;
+}
+
+async function callApi(path, body) {
+  const options = { cache: "no-store" };
+  if (body !== undefined) {
+    options.method = "POST";
+    options.headers = { "Content-Type": "application/json" };
+    options.body = JSON.stringify(body);
+  }
+  const response = await fetch(path, options);
+  if (!response.ok) {
+    throw new Error(`İstek başarısız oldu: ${response.status}`);
+  }
+  return response.json();
+}
+
+function formatDate(isoDate) {
+  const date = new Date(`${isoDate}T12:00:00`);
+  return date.toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" });
+}
+
+function formatClock(totalSeconds) {
+  const roundedSeconds = Math.ceil(totalSeconds);
+  const minutes = Math.floor(roundedSeconds / 60);
+  const seconds = String(roundedSeconds % 60).padStart(2, "0");
+  return `${minutes}:${seconds}`;
+}
+
+function playButtonLabel(slot, wordCount) {
+  if (wordCount === 1) {
+    return "Oyna";
+  }
+  return `${slot + 1}. sözcüğü oyna`;
+}
+
+async function loadLandingPage() {
+  clearError();
+  showScreen("landing-screen");
+  const container = element("play-buttons");
+  container.replaceChildren();
+  try {
+    const today = await callApi("/api/today");
+    element("today-date").textContent = formatDate(today.date);
+    for (let slot = 0; slot < today.word_count; slot += 1) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "button button-play";
+      button.textContent = playButtonLabel(slot, today.word_count);
+      button.addEventListener("click", () => startGame(slot));
+      container.append(button);
+    }
+  } catch (error) {
+    showError("Sunucuya ulaşılamadı. Sayfayı yenileyip tekrar dene.");
+  }
+}
+
+function secondsRemaining() {
+  return Math.max(0, (game.deadline - performance.now()) / 1000);
+}
+
+function syncWithServer(response) {
+  game.deadline = performance.now() + response.remaining_seconds * 1000;
+  game.scoreAtSync = response.score;
+  game.remainingAtSync = response.remaining_seconds;
+}
+
+function renderClock() {
+  const remaining = secondsRemaining();
+  const secondsSinceSync = game.remainingAtSync - remaining;
+  const potentialScore = game.scoreAtSync - game.pointsLostPerSecond * secondsSinceSync;
+
+  element("timer-text").textContent = formatClock(remaining);
+  element("potential-score").textContent = Math.round(potentialScore);
+  element("time-bar-fill").style.width = `${(remaining / game.durationSeconds) * 100}%`;
+  element("game-screen").classList.toggle("low-time", remaining <= LOW_TIME_SECONDS);
+}
+
+function tick() {
+  renderClock();
+  if (secondsRemaining() <= 0) {
+    endGame();
+  }
+}
+
+function buildHintSlot(hint) {
+  const slot = document.createElement("div");
+  slot.className = "hint-slot";
+
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "hint-button";
+
+  const label = document.createElement("span");
+  label.textContent = hint.label;
+  const cost = document.createElement("span");
+  cost.className = "hint-cost";
+  cost.textContent = `−${game.hintPenalty}`;
+
+  button.append(label, cost);
+  button.addEventListener("click", () => openHint(hint, slot));
+  slot.append(button);
+  return slot;
+}
+
+function renderHintText(hint, slot, text) {
+  const line = document.createElement("p");
+  line.className = `entry-line hint-${hint.kind}`;
+
+  const label = document.createElement("span");
+  label.className = "hint-line-label";
+  label.textContent = hint.label;
+
+  line.append(label, document.createTextNode(text));
+  slot.replaceChildren(line);
+  slot.classList.add("hint-slot-open");
+}
+
+async function openHint(hint, slot) {
+  try {
+    const response = await callApi(`/api/games/${game.id}/hints`, { kind: hint.kind });
+    if (response.finished) {
+      endGame();
+      return;
+    }
+    syncWithServer(response);
+    renderClock();
+    renderHintText(hint, slot, response.text);
+  } catch (error) {
+    element("guess-feedback").textContent = "İpucu alınamadı, tekrar dene.";
+  }
+}
+
+function addGuessToList(text, closeness, label) {
+  const item = document.createElement("li");
+  item.className = "guess-item";
+
+  const guessText = document.createElement("span");
+  guessText.className = "guess-text";
+  guessText.textContent = text;
+
+  const meter = document.createElement("span");
+  meter.className = "meter";
+  const meterFill = document.createElement("span");
+  meterFill.className = "meter-fill";
+  meterFill.style.width = `${closeness}%`;
+  meter.append(meterFill);
+
+  const verdict = document.createElement("span");
+  verdict.className = "guess-verdict";
+  verdict.textContent = `${label} · %${closeness}`;
+
+  item.append(guessText, meter, verdict);
+  element("guess-list").prepend(item);
+}
+
+async function submitGuess(event) {
+  event.preventDefault();
+  const input = element("guess-input");
+  const text = input.value.trim();
+  if (text === "" || game.isSubmitting) {
+    return;
+  }
+
+  game.isSubmitting = true;
+  element("guess-button").disabled = true;
+  try {
+    const response = await callApi(`/api/games/${game.id}/guesses`, { text });
+    if (response.finished) {
+      endGame();
+      return;
+    }
+    syncWithServer(response);
+    renderClock();
+    element("guess-feedback").textContent = response.message;
+    if (!response.rejected) {
+      addGuessToList(text, response.closeness, response.message);
+      input.value = "";
+    }
+  } catch (error) {
+    element("guess-feedback").textContent = "Tahmin gönderilemedi, tekrar dene.";
+  } finally {
+    game.isSubmitting = false;
+    element("guess-button").disabled = false;
+    input.focus();
+  }
+}
+
+async function startGame(slot) {
+  if (game.isStarting) {
+    return;
+  }
+  game.isStarting = true;
+  clearError();
+  try {
+    const started = await callApi("/api/games", { slot });
+
+    game.id = started.game_id;
+    game.durationSeconds = started.duration_seconds;
+    game.pointsLostPerSecond = started.points_lost_per_second;
+    game.hintPenalty = started.hint_penalty;
+    game.isEnding = false;
+    syncWithServer(started);
+
+    element("game-word").textContent = started.word;
+    element("guess-list").replaceChildren();
+    element("guess-feedback").textContent = "";
+    element("guess-input").value = "";
+    element("hint-list").replaceChildren(...started.hints.map(buildHintSlot));
+
+    showScreen("game-screen");
+    element("guess-input").focus();
+    renderClock();
+    game.timerId = setInterval(tick, TICK_MILLISECONDS);
+  } catch (error) {
+    showError("Oyun başlatılamadı. Biraz sonra tekrar dene.");
+  } finally {
+    game.isStarting = false;
+  }
+}
+
+async function endGame() {
+  if (game.isEnding) {
+    return;
+  }
+  game.isEnding = true;
+  clearInterval(game.timerId);
+  try {
+    const result = await callApi(`/api/games/${game.id}/finish`, {});
+    renderResult(result);
+  } catch (error) {
+    await loadLandingPage();
+    showError("Oyunun sonucu alınamadı.");
+  }
+}
+
+function renderResult(result) {
+  const stamp = element("result-stamp");
+  stamp.textContent = result.won ? "Buldun" : "Süre doldu";
+  stamp.classList.toggle("stamp-lost", !result.won);
+
+  element("result-word").textContent = result.word;
+  element("result-category").textContent = result.category;
+  element("result-parts").textContent = result.parts;
+  element("result-definition").textContent = result.definition;
+  element("result-sentence").textContent = result.sentence;
+
+  element("result-score").textContent = result.score;
+  element("result-time").textContent = formatClock(result.seconds_used);
+  element("result-hints").textContent = result.hints_used;
+  element("result-guesses").textContent = result.guess_count;
+  element("result-closeness").textContent = `%${result.best_closeness}`;
+
+  clearError();
+  showScreen("result-screen");
+}
+
+element("guess-form").addEventListener("submit", submitGuess);
+element("home-button").addEventListener("click", loadLandingPage);
+
+loadLandingPage();
