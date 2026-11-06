@@ -43,6 +43,7 @@ function showScreen(screenId) {
   for (const screen of document.querySelectorAll(".screen")) {
     screen.hidden = screen.id !== screenId;
   }
+  document.body.classList.toggle("landing-page", screenId === "landing-screen");
   window.scrollTo(0, 0);
 }
 
