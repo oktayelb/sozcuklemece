@@ -1,0 +1,464 @@
+{
+  "önözlem": {
+    "correct": [
+      "güzel bir an bitmeden onu özlemeye başlamak",
+      "henüz bitmemiş güzel bir şeyi şimdiden özlemek",
+      "mutlu bir anın sona ereceğini bilip hüzünlenmek",
+      "yaşarken özlemek",
+      "tatil bitmeden tatili özlemek",
+      "bitmesine üzülerek güzel anı özleme duygusu",
+      "şu an çok mutluyum ama bitecek diye şimdiden üzülüyorum",
+      "an devam ederken onun özlemini çekmek",
+      "son gün hissi, daha gitmeden orayı özlemek",
+      "güzel zamanların biteceğini düşünüp burukluk hissetmek",
+      "anı yaşarken gelecekte onu özleyeceğini bilmek"
+    ],
+    "partial": [
+      "özlem duymak",
+      "bir şeyin biteceğini bilmek"
+    ],
+    "wrong": [
+      "eski güzel günlere özlem duymak",
+      "birini görmeden önce duyulan heyecan",
+      "gelecekten korkmak",
+      "sevgiliye duyulan özlem",
+      "önünden geçerken selam vermek",
+      "hiçbir şeyi özlememek",
+      "çocukluğumu özlüyorum",
+      "yeni başlayacak bir işe duyulan merak",
+      "uzaktaki birine hasret",
+      "kıskançlık"
+    ],
+    "opposite": [
+      "güzel bir anın bitmesini sabırsızlıkla beklemek",
+      "bir an önce bitsin istemek"
+    ]
+  },
+  "sıyırgaç": {
+    "correct": [
+      "tabağı sıyırmak için kullanılan ekmek",
+      "sosu silen ekmek parçası",
+      "yemeğin sosunu toplamak için kullanılan ekmek",
+      "tabağın dibindeki sosu temizleyen ekmek",
+      "banıp tabağı temizlediğin ekmek lokması",
+      "tabakta sos kalmasın diye ekmeği sürmek",
+      "sos temizleme ekmeği",
+      "yemekten sonra tabağı ekmekle silmek",
+      "ekmekle tabağı sıyırma"
+    ],
+    "partial": [
+      "yemekten sonra tabağı temizlemek",
+      "ekmek"
+    ],
+    "wrong": [
+      "tencerenin dibini kazımaya yarayan spatula",
+      "kaşık",
+      "sebze soyma bıçağı",
+      "bulaşık süngeri",
+      "kar küreme aracı",
+      "boyayı sıyırmak için kullanılan alet",
+      "tavayı kazıyan metal alet",
+      "salatayı karıştırmaya yarayan kaşık",
+      "sosu tabağa dökmek için kullanılan kepçe",
+      "peynir rendesi",
+      "dondurma kaşığı"
+    ],
+    "opposite": []
+  },
+  "sorusavar": {
+    "correct": [
+      "sorulara cevap vermeyen siyasetçi",
+      "gazetecilerin sorularını geçiştiren politikacı",
+      "soruları ustaca savuşturan kişi",
+      "basın toplantısında soruları yanıtlamadan kaçan politikacı",
+      "sorudan kaçan siyasetçi",
+      "sorulan soruya cevap vermeyip konuyu değiştiren politikacı",
+      "mikrofon uzatılınca kaçamak konuşan siyasi",
+      "zor sorulardan sıyrılmayı bilen siyasetçi",
+      "basının sorularını atlatan başkan"
+    ],
+    "partial": [
+      "soruları sevmeyen kişi",
+      "cevap vermekten kaçınmak"
+    ],
+    "wrong": [
+      "her şeyi sorgulayan meraklı insan",
+      "her soruya dürüstçe cevap veren siyasetçi",
+      "sınav sorularını hazırlayan öğretmen",
+      "gazeteci",
+      "uçakları düşüren silah",
+      "yarışmada soruları bilen yarışmacı",
+      "soru bankası",
+      "soru sormaktan çekinmeyen öğrenci",
+      "seçim kazanan başkan",
+      "füze savunma sistemi"
+    ],
+    "opposite": [
+      "gazetecilerin tüm sorularını içtenlikle yanıtlayan politikacı",
+      "şeffaf ve açık sözlü lider"
+    ]
+  },
+  "kökağı": {
+    "correct": [
+      "ağaçların kökleriyle birbirine bağlı olduğu yeraltı ağı",
+      "ağaçların mantarlar sayesinde yer altında haberleşmesi",
+      "bitkilerin kökleri üzerinden besin paylaştığı sistem",
+      "ormanın toprak altındaki ağ yapısı",
+      "köklerin toprak altında oluşturduğu ağ",
+      "ağaçlar arası yeraltı iletişimi",
+      "mantar ipliklerinin ağaçları birbirine bağlaması",
+      "ağaçların toprak altında birbirine şeker göndermesi",
+      "orman altı besin paylaşım ağı"
+    ],
+    "partial": [
+      "ağaç kökleri",
+      "mantarlar"
+    ],
+    "wrong": [
+      "havuç gibi toprak altında yetişen sebzeler",
+      "internet ağı",
+      "balıkçı ağı",
+      "örümcek ağı",
+      "bir sözcüğün kökü",
+      "sosyal medya ağı",
+      "patates ve havuç",
+      "kökleri çok derin olan ağaç",
+      "saç kökü",
+      "wifi ağı",
+      "kök hücre",
+      "ağaç kesmek"
+    ],
+    "opposite": []
+  },
+  "duşyanıtı": {
+    "correct": [
+      "tartışma bittikten sonra aklına gelen cevap",
+      "kavgadan sonra akla gelen iyi laf",
+      "sonradan düşündüğün ve o an söyleyemediğin mükemmel cevap",
+      "geç akla gelen cevap",
+      "konuşma bitince keşke deseydim dediğin söz",
+      "kavga bittikten sonra düşündüğün süper cevap",
+      "keşke şunu deseydim dediğin an",
+      "tam da o anda değil de sonradan aklına gelen laf sokma",
+      "atışma bitince bulunan en iyi karşılık"
+    ],
+    "partial": [
+      "tartışmada iyi cevap vermek",
+      "duşta düşünmek"
+    ],
+    "wrong": [
+      "duşta şarkı söylemek",
+      "mesaja hemen cevap vermek",
+      "banyo yaparken gelen telefon",
+      "sıcak su",
+      "soru sormak",
+      "duş sırasında akla gelen iş fikirleri",
+      "duşta aklına gelen şarkı",
+      "banyoda konuşmak",
+      "soğuk duş almak",
+      "telefonda sesli yanıt"
+    ],
+    "opposite": [
+      "tartışma anında ağzının payını veren kapak gibi cevap",
+      "hazırcevap olmak"
+    ]
+  },
+  "hesapgüreşi": {
+    "correct": [
+      "restoranda hesabı kimin ödeyeceği konusunda tartışmak",
+      "hesabı ben ödeyeceğim diye arkadaşlarla kavga etmek",
+      "arkadaşların hesabı ödemek için birbiriyle yarışması",
+      "garsona parayı ilk veren olmaya çalışmak",
+      "yemekten sonra hesabı kapma çekişmesi",
+      "masada kim ödeyecek kavgası",
+      "herkesin ben ödeyeceğim diye diretmesi",
+      "dostların adisyonu kapmak için atışması",
+      "hesabı ödemek için kapışmak"
+    ],
+    "partial": [
+      "hesap ödemek",
+      "arkadaşlarla yemek yemek"
+    ],
+    "wrong": [
+      "hesabı eşit olarak bölüşmek",
+      "hesabı ödemeden kaçmak",
+      "matematik problemi çözme yarışması",
+      "banka hesabı açmak",
+      "güreş müsabakası",
+      "hesap makinesi",
+      "adisyonu ayrı ayrı ödemek",
+      "muhasebe işi",
+      "yağlı güreş",
+      "kredi kartı borcu"
+    ],
+    "opposite": [
+      "kimsenin hesabı ödemek istememesi",
+      "hesabı ödemekten kaçmak için tuvalete gitmek"
+    ]
+  },
+  "sandıksever": {
+    "correct": [
+      "sadece seçim zamanı halkın yanına gelen siyasetçi",
+      "seçimden seçime ortaya çıkan politikacı",
+      "yalnızca oy toplamak için halka görünen vekil",
+      "seçim yaklaşınca mahalleye gelen aday",
+      "seçim döneminde halkı hatırlayan siyasetçi",
+      "seçim gelince ortaya çıkan siyasetçi",
+      "oy zamanı esnafı gezen politikacı",
+      "seçimler dışında halkla ilgilenmeyen milletvekili",
+      "yalnızca oy istemeye gelen aday"
+    ],
+    "partial": [
+      "seçim kazanmak isteyen siyasetçi",
+      "popülist politikacı"
+    ],
+    "wrong": [
+      "her seçimde oy kullanmayı seven vatandaş",
+      "eski sandık koleksiyonu yapan kişi",
+      "her zaman halkın arasında olan siyasetçi",
+      "seçim sandığı",
+      "sandıkta saklanan çeyiz",
+      "demokrasiye inanan kişi",
+      "hazine sandığı",
+      "oy pusulası",
+      "sandığa atılan zarf",
+      "seçim yasağı"
+    ],
+    "opposite": [
+      "dört yıl boyunca mahalleyi hiç ihmal etmeyen siyasetçi",
+      "sandık başına gitmeyi çok seven seçmen"
+    ]
+  },
+  "sürüaklı": {
+    "correct": [
+      "karıncaların birlikte hareket edince oluşturduğu zeka",
+      "hayvanların topluca akıllı davranması",
+      "kolektif zeka",
+      "bir sürünün tek bir akıl gibi davranması",
+      "basit canlıların birlikte problem çözmesi",
+      "arıların tek bir organizma gibi karar alması",
+      "kuş sürülerinin birlikte akıllıca uçması",
+      "basit bireylerin toplulukça zeki davranması",
+      "karınca kolonisinin ortak zekası"
+    ],
+    "partial": [
+      "hayvan sürüleri",
+      "karıncalar"
+    ],
+    "wrong": [
+      "düşünmeden kalabalığın peşinden gitmek",
+      "koyun sürüsünü otlatan çoban",
+      "aklını kaybetmek",
+      "sürücü belgesi",
+      "zeki insan",
+      "araba sürmek",
+      "akıllı hayvanlar",
+      "inek çiftliği",
+      "dahi çocuk",
+      "akıl oyunları"
+    ],
+    "opposite": [
+      "koyun gibi sürüye uymak",
+      "kalabalığa uyup aptalca davranmak"
+    ]
+  },
+  "kaydırmaca": {
+    "correct": [
+      "telefonda boş boş ekranı kaydırmak",
+      "sosyal medyada amaçsızca gezinmek",
+      "instagramda saatlerce aşağı kaydırmak",
+      "ekranda durmadan gezinerek zaman öldürmek",
+      "telefonda vakit kaybetmek",
+      "reels'te saatlerce takılı kalmak",
+      "sosyal medyada boşuna zaman harcamak",
+      "uyumadan önce telefonda akışı aşağı çekmek",
+      "tiktok'ta bitmeyen video izleme",
+      "parmakla ekranı kaydırıp durmak"
+    ],
+    "partial": [
+      "telefon bağımlılığı",
+      "ekrana bakmak"
+    ],
+    "wrong": [
+      "karda kızakla kaymak",
+      "çocukların oynadığı kayma oyunu",
+      "buzda kayıp düşmek",
+      "telefonu kapatıp dışarı çıkmak",
+      "parkta kaydırak",
+      "kağıt kaydırma tekniği",
+      "kızak kaymak",
+      "mobil bankacılık",
+      "kaydırak oyunu",
+      "buz pateni",
+      "bilgisayarda dosya taşımak"
+    ],
+    "opposite": [
+      "telefonu elinden bırakıp kitap okumak"
+    ]
+  },
+  "eşikunutu": {
+    "correct": [
+      "odaya girince neden geldiğini unutmak",
+      "bir yere gidip ne için gittiğini hatırlayamamak",
+      "mutfağa gidip ne alacağını unutmak",
+      "kapıdan geçince aklındakini unutmak",
+      "neden kalktığını unutma",
+      "mutfağa girip ne için geldiğimi unutmam",
+      "kapıdan geçer geçmez ne yapacağını unutma durumu",
+      "salona gittim ama neden gittiğimi hatırlamıyorum",
+      "odaya gelince amacını unutmak"
+    ],
+    "partial": [
+      "unutkanlık",
+      "aklına gelmemek"
+    ],
+    "wrong": [
+      "anahtarı evde unutmak",
+      "birinin adını hatırlayamamak",
+      "kapı eşiğinde durmak",
+      "hiçbir şeyi unutmamak",
+      "evlenince gelinin eşiği atlaması",
+      "doğum gününü unutmak",
+      "şifreyi unutmak",
+      "sınavda bildiklerini unutmak",
+      "kapıyı kilitlemeyi unutmak",
+      "alzheimer hastalığı",
+      "eşiğe takılıp düşmek"
+    ],
+    "opposite": [
+      "ne için geldiğini hiç unutmamak"
+    ]
+  },
+  "kuyruktaş": {
+    "correct": [
+      "sırada yanında bekleyen kişi",
+      "aynı kuyrukta beklediğin yabancı",
+      "uzun kuyrukta sohbet ettiğin insan",
+      "sırada tanıştığın kişi",
+      "kuyrukta kaynaştığın adam",
+      "kuyrukta önündeki ya da arkasındaki kişi",
+      "aynı sırayı beklediğin insan",
+      "bankada sırada arkadaş olduğun kişi",
+      "sıra beklerken tanıştığın yabancı"
+    ],
+    "partial": [
+      "kuyruk beklemek",
+      "yabancı biriyle sohbet etmek"
+    ],
+    "wrong": [
+      "hayvanın kuyruğundaki kemik",
+      "sıraya kaynak yapan kişi",
+      "taş kuyruğu",
+      "yol arkadaşı",
+      "meslektaş",
+      "bir kedi türü",
+      "uzun saçlı kız",
+      "kedinin kuyruğu",
+      "sınıf arkadaşı",
+      "komşu",
+      "taş ocağı işçisi"
+    ],
+    "opposite": [
+      "sıraya kaynak yapan uyanık"
+    ]
+  },
+  "cepyoklaması": {
+    "correct": [
+      "evden çıkarken ceplerini kontrol etmek",
+      "telefon anahtar cüzdan yerinde mi diye bakmak",
+      "ceplere dokunarak eşyaların tam olduğundan emin olmak",
+      "dışarı çıkmadan eşyalarını kontrol etme",
+      "kapıdan çıkmadan önce ceplerini yoklama",
+      "kapıdan çıkarken anahtar cüzdan telefon kontrolü",
+      "ceplerine vurarak bir şey unuttun mu diye bakmak",
+      "evden çıkmadan her şeyi aldım mı diye ceplere bakma",
+      "ceplerde eşyaları yoklamak"
+    ],
+    "partial": [
+      "cebe bakmak",
+      "anahtarını aramak"
+    ],
+    "wrong": [
+      "cepteki parayı saymak",
+      "sınıfta öğretmenin yoklama alması",
+      "telefonun faturasını ödemek",
+      "cep telefonu almak",
+      "ceplerini boşaltmak",
+      "hırsızın cebinden cüzdan çalması",
+      "cepteki bozuk paralar",
+      "pantolon cebi dikmek",
+      "cep harçlığı",
+      "seçmen yoklaması",
+      "mobil hat tarifesi"
+    ],
+    "opposite": [
+      "hiç kontrol etmeden evden çıkmak"
+    ]
+  },
+  "evimsemek": {
+    "correct": [
+      "yeni bir yeri kendi evi gibi hissetmek",
+      "bir yere alışıp orayı ev gibi görmek",
+      "gittiğin yeri yuvan gibi benimsemek",
+      "bir şehri evin gibi hissetmek",
+      "bir mekanı ev gibi sahiplenmek",
+      "gittiğin yeri yuva gibi hissetmek",
+      "yabancı bir şehri kendi evin gibi benimsemek",
+      "yurdu ev gibi görmeye başlamak",
+      "yeni mahallesine ısınıp evinde gibi hissetmek"
+    ],
+    "partial": [
+      "bir yere alışmak",
+      "evi sevmek"
+    ],
+    "wrong": [
+      "evini temizlemek",
+      "evden uzakta evi özlemek",
+      "yeni ev satın almak",
+      "bir yere asla alışamamak",
+      "evlenmek",
+      "evcil hayvan beslemek",
+      "evde oturmak",
+      "ev kirası",
+      "evi boyamak",
+      "vatan hasreti"
+    ],
+    "opposite": [
+      "yeni geldiği yerde kendini hep yabancı hissetmek",
+      "hiçbir yeri ev gibi hissetmemek"
+    ]
+  },
+  "oyalanç": {
+    "correct": [
+      "işi ertelemek için yapılan gereksiz şey",
+      "asıl işten kaçmak için uğraşılan önemsiz meşgale",
+      "ders çalışmamak için yaptığın başka şeyler",
+      "erteleme bahanesi olan küçük uğraş",
+      "iş yapmıyormuş gibi oyalanmak",
+      "ödev yapmamak için odayı toplamak",
+      "işten kaçmak için bulduğun küçük bahane uğraşı",
+      "yapılacak işi geciktirmek için yapılan ıvır zıvır",
+      "sınavdan önce çalışmak yerine yapılan gereksiz işler"
+    ],
+    "partial": [
+      "vakit geçirmek",
+      "tembellik"
+    ],
+    "wrong": [
+      "bebeği oyalayan oyuncak",
+      "boş zamanlarda yapılan hobi",
+      "işleri hemen bitirmek",
+      "sevinç duymak",
+      "zamanında görev tamamlamak",
+      "inanç",
+      "bebek oyuncağı",
+      "sevinmek",
+      "haftasonu tatili",
+      "resim yapmak hobisi",
+      "yorgun olmak"
+    ],
+    "opposite": [
+      "işini hiç ertelemeden hemen yapmak"
+    ]
+  }
+}
