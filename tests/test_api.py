@@ -7,6 +7,12 @@ from fastapi.testclient import TestClient
 from backend import main
 from backend.game import GAME_SECONDS
 from backend.puzzles import load_puzzles, puzzles_for_day
+from backend.rate_limit import (
+    GAME_START_LIMIT,
+    GAME_START_WINDOW_SECONDS,
+    GUESS_LIMIT,
+    GUESS_WINDOW_SECONDS,
+)
 from tests.fakes import ExactMatchEncoder
 
 GAME_DAY = date(2026, 11, 6)
@@ -34,6 +40,11 @@ def start_game(client, slot=0):
 
 def guess(client, game_id, text):
     return client.post(f"/api/games/{game_id}/guesses", json={"text": text})
+
+
+def use_up_guess_limit(client, game_id):
+    for _ in range(GUESS_LIMIT):
+        assert guess(client, game_id, UNKNOWN_GUESS).status_code == 200
 
 
 def test_today_reports_date_and_word_count(client):
@@ -173,3 +184,69 @@ def test_empty_and_oversized_guesses_are_refused(client):
     game_id = start_game(client)["game_id"]
     assert guess(client, game_id, "").status_code == 422
     assert guess(client, game_id, "a" * 201).status_code == 422
+
+
+def test_guess_over_the_limit_is_refused_with_a_wait_time(client):
+    game_id = start_game(client)["game_id"]
+    use_up_guess_limit(client, game_id)
+
+    refused = guess(client, game_id, UNKNOWN_GUESS)
+
+    assert refused.status_code == 429
+    assert 1 <= int(refused.headers["retry-after"]) <= GUESS_WINDOW_SECONDS
+
+
+def test_refused_guess_does_not_reach_the_game(client):
+    game_id = start_game(client)["game_id"]
+    use_up_guess_limit(client, game_id)
+
+    guess(client, game_id, UNKNOWN_GUESS)
+
+    result = client.post(f"/api/games/{game_id}/finish").json()
+    assert result["guess_count"] == GUESS_LIMIT
+
+
+def test_guess_is_accepted_again_after_the_window(client, monkeypatch):
+    game_id = start_game(client)["game_id"]
+    use_up_guess_limit(client, game_id)
+
+    real_monotonic = main.time.monotonic
+    monkeypatch.setattr(main.time, "monotonic", lambda: real_monotonic() + GUESS_WINDOW_SECONDS)
+
+    assert guess(client, game_id, UNKNOWN_GUESS).status_code == 200
+
+
+def test_guess_limit_is_counted_per_client(client):
+    game_id = start_game(client)["game_id"]
+    use_up_guess_limit(client, game_id)
+
+    other_player = TestClient(main.app, client=("203.0.113.7", 50000))
+
+    assert guess(other_player, game_id, UNKNOWN_GUESS).status_code == 200
+
+
+def test_hints_and_finish_still_work_after_the_guess_limit(client):
+    game_id = start_game(client)["game_id"]
+    use_up_guess_limit(client, game_id)
+
+    hint = client.post(f"/api/games/{game_id}/hints", json={"kind": "parts"})
+    finish = client.post(f"/api/games/{game_id}/finish")
+
+    assert hint.status_code == 200
+    assert finish.status_code == 200
+
+
+def test_starting_too_many_games_is_refused_with_a_wait_time(client):
+    for _ in range(GAME_START_LIMIT):
+        start_game(client)
+
+    refused = client.post("/api/games", json={"slot": 0})
+
+    assert refused.status_code == 429
+    assert 1 <= int(refused.headers["retry-after"]) <= GAME_START_WINDOW_SECONDS
+    assert len(client.app.state.games) == GAME_START_LIMIT
+
+
+def test_request_without_a_client_address_still_works(client):
+    anonymous_player = TestClient(main.app, client=None)
+    assert anonymous_player.post("/api/games", json={"slot": 0}).status_code == 200

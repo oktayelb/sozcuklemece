@@ -37,4 +37,10 @@ Testler: `uv run pytest`
 
 Sonra doğrulukla ilgili hatalı kararları gör: `uv run python -m tools.evaluate_guesses`
 
-Oyun ayarları: kazanma eşiği `backend/similarity.py`, süre ve puan `backend/game.py`, günlük sözcük sayısı `backend/puzzles.py`.
+Oyun ayarları: kazanma eşiği `backend/similarity.py`, süre ve puan `backend/game.py`, günlük sözcük sayısı `backend/puzzles.py`, istek sınırları `backend/rate_limit.py`.
+
+## İstek sınırı
+
+Oyun başlatma ve tahmin istekleri IP başına sınırlı. Sınır aşılınca sunucu 429 ve `Retry-After` döner. Sayaçlar oyunlar gibi süreç belleğinde tutuluyor, bu yüzden tek süreçle çalışır.
+
+Ters vekil (nginx vb.) başka bir makinedeyse uvicorn'a `--forwarded-allow-ips <vekil-ip>` ver, yoksa bütün oyuncular tek IP sayılır.

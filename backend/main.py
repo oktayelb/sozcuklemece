@@ -1,3 +1,4 @@
+import math
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -16,6 +17,15 @@ from backend.puzzles import (
     current_game_day,
     load_puzzles,
     puzzles_for_day,
+)
+from backend.rate_limit import (
+    GAME_START_LIMIT,
+    GAME_START_WINDOW_SECONDS,
+    GUESS_LIMIT,
+    GUESS_WINDOW_SECONDS,
+    UNKNOWN_CLIENT,
+    RateLimiter,
+    rate_limit_key,
 )
 from backend.schemas import (
     FinishResponse,
@@ -38,6 +48,8 @@ async def lifespan(app):
     app.state.puzzles = load_puzzles()
     app.state.judge = MeaningJudge(BertEncoder(), app.state.puzzles)
     app.state.games = {}
+    app.state.game_start_limiter = RateLimiter(GAME_START_LIMIT, GAME_START_WINDOW_SECONDS)
+    app.state.guess_limiter = RateLimiter(GUESS_LIMIT, GUESS_WINDOW_SECONDS)
     yield
 
 
@@ -51,6 +63,17 @@ def find_game(request, game_id):
     return game
 
 
+def enforce_rate_limit(request, limiter):
+    host = request.client.host if request.client else UNKNOWN_CLIENT
+    seconds_to_wait = limiter.register_request(rate_limit_key(host), time.monotonic())
+    if seconds_to_wait > 0:
+        raise HTTPException(
+            status_code=429,
+            detail="Çok fazla istek gönderildi. Biraz bekleyip tekrar dene.",
+            headers={"Retry-After": str(math.ceil(seconds_to_wait))},
+        )
+
+
 @app.get("/api/today", response_model=TodayResponse)
 def get_today():
     return TodayResponse(date=current_game_day().isoformat(), word_count=WORDS_PER_DAY)
@@ -58,6 +81,7 @@ def get_today():
 
 @app.post("/api/games", response_model=StartResponse)
 def start_game(body: StartRequest, request: Request):
+    enforce_rate_limit(request, request.app.state.game_start_limiter)
     if body.slot >= WORDS_PER_DAY:
         raise HTTPException(status_code=404, detail="Bugün için böyle bir sözcük yok.")
 
@@ -89,6 +113,7 @@ def reveal_hint(game_id: str, body: HintRequest, request: Request):
 
 @app.post("/api/games/{game_id}/guesses", response_model=GuessResponse)
 def submit_guess(game_id: str, body: GuessRequest, request: Request):
+    enforce_rate_limit(request, request.app.state.guess_limiter)
     game = find_game(request, game_id)
     return game.submit_guess(body.text, request.app.state.judge, time.monotonic())
 

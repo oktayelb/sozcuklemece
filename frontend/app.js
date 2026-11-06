@@ -57,6 +57,13 @@ function clearError() {
   element("error-banner").hidden = true;
 }
 
+class RateLimitError extends Error {
+  constructor(retryAfterSeconds) {
+    super("İstek sınırı aşıldı.");
+    this.retryAfterSeconds = retryAfterSeconds;
+  }
+}
+
 async function callApi(path, body) {
   const options = { cache: "no-store" };
   if (body !== undefined) {
@@ -65,10 +72,20 @@ async function callApi(path, body) {
     options.body = JSON.stringify(body);
   }
   const response = await fetch(path, options);
+  if (response.status === 429) {
+    throw new RateLimitError(Number(response.headers.get("Retry-After")));
+  }
   if (!response.ok) {
     throw new Error(`İstek başarısız oldu: ${response.status}`);
   }
   return response.json();
+}
+
+function requestFailureMessage(error, fallbackMessage) {
+  if (error instanceof RateLimitError) {
+    return `Çok fazla istek gönderildi. ${error.retryAfterSeconds} saniye sonra tekrar dene.`;
+  }
+  return fallbackMessage;
 }
 
 function formatDate(isoDate) {
@@ -230,7 +247,7 @@ async function submitGuess(event) {
       input.value = "";
     }
   } catch (error) {
-    element("guess-feedback").textContent = "Tahmin gönderilemedi, tekrar dene.";
+    element("guess-feedback").textContent = requestFailureMessage(error, "Tahmin gönderilemedi, tekrar dene.");
   } finally {
     game.isSubmitting = false;
     element("guess-button").disabled = false;
@@ -264,7 +281,7 @@ async function startGame(slot) {
     renderClock();
     game.timerId = setInterval(tick, TICK_MILLISECONDS);
   } catch (error) {
-    showError("Oyun başlatılamadı. Biraz sonra tekrar dene.");
+    showError(requestFailureMessage(error, "Oyun başlatılamadı. Biraz sonra tekrar dene."));
   } finally {
     game.isStarting = false;
   }
