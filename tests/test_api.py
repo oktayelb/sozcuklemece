@@ -47,6 +47,13 @@ def test_frontend_is_served(client):
     assert "Sözcüklemece" in response.text
 
 
+@pytest.mark.parametrize("number", [1, 2, 3])
+def test_pencil_sounds_are_served(client, number):
+    response = client.get(f"/sounds/pencil-{number}.mp3")
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "audio/mpeg"
+
+
 def test_start_gives_word_and_hint_names_without_hint_contents(client):
     puzzle = expected_puzzle(0)
     body = start_game(client)

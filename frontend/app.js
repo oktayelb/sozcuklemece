@@ -1,5 +1,7 @@
 const LOW_TIME_SECONDS = 30;
 const TICK_MILLISECONDS = 200;
+const PENCIL_SOUND_FILES = ["sounds/pencil-1.mp3", "sounds/pencil-2.mp3", "sounds/pencil-3.mp3"];
+const PENCIL_SOUND_VOLUME = 0.7;
 
 const game = {
   id: null,
@@ -12,8 +14,29 @@ const game = {
   isSubmitting: false,
 };
 
+const pencilSounds = PENCIL_SOUND_FILES.map(loadSound);
+let nextPencilSound = 0;
+
 function element(id) {
   return document.getElementById(id);
+}
+
+function loadSound(file) {
+  const sound = new Audio(file);
+  sound.preload = "auto";
+  sound.volume = PENCIL_SOUND_VOLUME;
+  return sound;
+}
+
+async function playPencilSound() {
+  const sound = pencilSounds[nextPencilSound];
+  nextPencilSound = (nextPencilSound + 1) % pencilSounds.length;
+  sound.currentTime = 0;
+  try {
+    await sound.play();
+  } catch (error) {
+    console.debug("Kalem sesi çalınamadı:", error);
+  }
 }
 
 function showScreen(screenId) {
@@ -191,6 +214,7 @@ async function submitGuess(event) {
 
   game.isSubmitting = true;
   element("guess-button").disabled = true;
+  playPencilSound();
   try {
     const response = await callApi(`/api/games/${game.id}/guesses`, { text });
     if (response.finished) {
