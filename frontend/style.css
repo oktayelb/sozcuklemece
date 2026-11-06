@@ -1,0 +1,554 @@
+@font-face {
+  font-family: "Fraunces";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("fonts/fraunces-latin-ext-wght-normal.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: "Fraunces";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("fonts/fraunces-latin-wght-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Fraunces";
+  font-style: italic;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("fonts/fraunces-latin-ext-wght-italic.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: "Fraunces";
+  font-style: italic;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("fonts/fraunces-latin-wght-italic.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Caveat";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("fonts/caveat-latin-ext-600-normal.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: "Caveat";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("fonts/caveat-latin-600-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+:root {
+  --desk: #38403b;
+  --paper: #f5eedd;
+  --paper-under: #e8dfc9;
+  --ink: #26231e;
+  --ink-soft: #6c6355;
+  --pen-blue: #26408f;
+  --pencil-red: #b3271d;
+  --rule: rgba(58, 84, 120, 0.24);
+  --serif: "Fraunces", Georgia, "Times New Roman", serif;
+  --hand: "Caveat", "Segoe Print", cursive;
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .36 0 0 0 0 .28 0 0 0 0 .17 .16 0 0 0 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+html {
+  font-size: 17px;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  padding: 36px 16px;
+  color: var(--ink);
+  background: var(--desk);
+  font-family: var(--serif);
+  line-height: 1.5;
+}
+
+.sheet {
+  position: relative;
+  max-width: 720px;
+  min-height: calc(100dvh - 72px);
+  margin: 0 auto;
+  padding: clamp(28px, 6vw, 60px);
+  background-color: var(--paper);
+  background-image: var(--grain);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 22px 44px rgba(0, 0, 0, 0.38);
+}
+
+.sheet::before,
+.sheet::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-color: var(--paper-under);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.sheet::before {
+  transform: rotate(-0.8deg);
+}
+
+.sheet::after {
+  transform: rotate(0.6deg);
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+.landing {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100dvh - 72px - 2 * clamp(28px, 6vw, 60px));
+  text-align: center;
+}
+
+.logo {
+  font-size: clamp(2.6rem, 9.5vw, 4.5rem);
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.025em;
+}
+
+.logo-hyphen {
+  color: var(--pencil-red);
+}
+
+.logo-gloss {
+  max-width: 26rem;
+  margin-top: 1.1rem;
+  padding-top: 1.1rem;
+  border-top: 3px double var(--ink);
+  color: var(--ink-soft);
+  font-size: 1.08rem;
+}
+
+.logo-gloss em {
+  color: var(--pencil-red);
+}
+
+.play-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.9rem;
+  min-height: 3rem;
+  margin-top: 2.4rem;
+}
+
+.today-date {
+  margin-top: 1.4rem;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+  font-style: italic;
+}
+
+.button {
+  padding: 0.62em 1.35em;
+  border: 0;
+  border-radius: 2px;
+  color: var(--paper);
+  background: var(--ink);
+  box-shadow: 2px 3px 0 rgba(38, 35, 30, 0.28);
+  font-family: var(--serif);
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+
+.button:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 4px 0 rgba(38, 35, 30, 0.28);
+}
+
+.button:active {
+  transform: translate(1px, 2px);
+  box-shadow: 0 0 0 rgba(38, 35, 30, 0.28);
+}
+
+.button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.button:focus-visible,
+.hint-button:focus-visible {
+  outline: 2px solid var(--pen-blue);
+  outline-offset: 3px;
+}
+
+.clock {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.timer {
+  font-size: 2.3rem;
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums lining-nums;
+  letter-spacing: -0.01em;
+}
+
+.potential {
+  color: var(--ink-soft);
+  font-size: 1.05rem;
+  font-style: italic;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.time-bar {
+  height: 3px;
+  margin-top: 0.55rem;
+  background: var(--rule);
+}
+
+.time-bar-fill {
+  width: 100%;
+  height: 100%;
+  background: var(--ink);
+}
+
+.low-time .timer {
+  color: var(--pencil-red);
+}
+
+.low-time .time-bar-fill {
+  background: var(--pencil-red);
+}
+
+.entry {
+  margin-top: 1.9rem;
+}
+
+.headword {
+  font-size: clamp(2.3rem, 8vw, 3.4rem);
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+
+.hint-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem 0.7rem;
+  margin-top: 1rem;
+}
+
+.hint-slot-open {
+  flex-basis: 100%;
+  order: -1;
+}
+
+.hint-button {
+  display: inline-flex;
+  gap: 0.55em;
+  padding: 0.34em 0.7em;
+  border: 1px dashed var(--ink-soft);
+  border-radius: 2px;
+  color: var(--ink);
+  background: transparent;
+  font-family: var(--serif);
+  font-size: 0.86rem;
+  cursor: pointer;
+}
+
+.hint-button:hover {
+  border-style: solid;
+  background: rgba(38, 35, 30, 0.05);
+}
+
+.hint-cost {
+  color: var(--pencil-red);
+  font-variant-numeric: lining-nums;
+}
+
+.entry-line {
+  overflow-wrap: anywhere;
+}
+
+.hint-line-label {
+  display: block;
+  color: var(--ink-soft);
+  font-size: 0.74rem;
+  font-style: normal;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.hint-sentence {
+  font-style: italic;
+}
+
+.hint-category {
+  color: var(--pencil-red);
+}
+
+.guess-form {
+  margin-top: 2rem;
+}
+
+.guess-label {
+  font-size: 1.05rem;
+  font-style: italic;
+}
+
+.guess-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.8rem;
+  margin-top: 0.2rem;
+}
+
+.guess-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.1rem 0.1rem 0.15rem;
+  border: 0;
+  border-bottom: 2px solid var(--rule);
+  border-radius: 0;
+  outline: none;
+  color: var(--pen-blue);
+  background: transparent;
+  font-family: var(--hand);
+  font-size: 1.75rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.guess-input:focus {
+  border-bottom-color: var(--pen-blue);
+}
+
+.feedback {
+  min-height: 2rem;
+  margin-top: 0.6rem;
+  color: var(--pencil-red);
+  font-family: var(--hand);
+  font-size: 1.45rem;
+  font-weight: 600;
+  line-height: 1.3;
+  transform: rotate(-0.8deg);
+  transform-origin: left;
+}
+
+.guess-list {
+  margin: 0.2rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.guess-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 84px 7.2rem;
+  gap: 0.2rem 0.8rem;
+  align-items: center;
+  padding: 0.3rem 0;
+  border-bottom: 1px solid var(--rule);
+  animation: guess-appears 0.25s ease-out;
+}
+
+.guess-text {
+  color: var(--pen-blue);
+  font-family: var(--hand);
+  font-size: 1.4rem;
+  font-weight: 600;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.meter {
+  display: block;
+  height: 9px;
+  border: 1px solid var(--ink-soft);
+}
+
+.meter-fill {
+  display: block;
+  height: 100%;
+  background: repeating-linear-gradient(115deg, var(--pen-blue) 0 2px, transparent 2px 4px);
+}
+
+.guess-verdict {
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+  font-variant-numeric: lining-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.stamp {
+  float: right;
+  margin: 0.2rem 0 0.8rem 1rem;
+  padding: 0.18em 0.6em;
+  border: 3px double var(--pencil-red);
+  color: var(--pencil-red);
+  font-size: 1.3rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  mix-blend-mode: multiply;
+  transform: rotate(-7deg);
+  animation: stamp-lands 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+
+.stamp-lost {
+  border-color: var(--ink-soft);
+  color: var(--ink-soft);
+}
+
+.result .entry {
+  margin-top: 0.3rem;
+}
+
+.entry-category {
+  margin-top: 0.3rem;
+  color: var(--pencil-red);
+  font-size: 0.92rem;
+}
+
+.result .entry-line:not(.entry-category) {
+  margin-top: 0.75rem;
+  color: var(--ink-soft);
+}
+
+.result .entry-sentence {
+  font-style: italic;
+}
+
+.definition {
+  clear: both;
+  margin-top: 1.1rem;
+  padding-left: 0.9rem;
+  border-left: 3px solid var(--pencil-red);
+  font-size: 1.32rem;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.tally {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem 2.2rem;
+  align-items: flex-end;
+  margin: 2rem 0 1.8rem;
+  padding: 1rem 0;
+  border-top: 3px double var(--ink);
+  border-bottom: 1px solid var(--ink);
+}
+
+.tally-item dt {
+  color: var(--ink-soft);
+  font-size: 0.74rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.tally-item dd {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 600;
+  line-height: 1.2;
+  font-variant-numeric: lining-nums;
+}
+
+.tally-score dd {
+  font-size: 2.5rem;
+  line-height: 1;
+}
+
+.error-banner {
+  margin-top: 1.5rem;
+  color: var(--pencil-red);
+  font-style: italic;
+  text-align: center;
+}
+
+@keyframes guess-appears {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+}
+
+@keyframes stamp-lands {
+  from {
+    opacity: 0;
+    transform: rotate(-7deg) scale(1.7);
+  }
+}
+
+@media (max-width: 760px) {
+  body {
+    padding: 0;
+  }
+
+  .sheet {
+    min-height: 100dvh;
+    box-shadow: none;
+  }
+
+  .sheet::before,
+  .sheet::after {
+    display: none;
+  }
+
+  .landing {
+    min-height: calc(100dvh - 2 * clamp(28px, 6vw, 60px));
+  }
+
+  .guess-item {
+    grid-template-columns: 84px minmax(0, 1fr);
+  }
+
+  .guess-text {
+    grid-column: 1 / -1;
+  }
+
+  .tally {
+    gap: 0.7rem 1.5rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

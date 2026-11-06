@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Yeni Sözcükle-</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="sheet">
+
+    <section id="landing-screen" class="screen landing">
+      <h1 class="logo">Yeni Sözcükle<span class="logo-hyphen">-</span></h1>
+      <p class="logo-gloss"><em>fiil.</em> Daha önce hiç duyulmamış bir sözcüğün anlamını üç dakikada bulmak.</p>
+      <div id="play-buttons" class="play-buttons"></div>
+      <p id="today-date" class="today-date"></p>
+    </section>
+
+    <section id="game-screen" class="screen" hidden>
+      <header class="game-header">
+        <div class="clock">
+          <span id="timer-text" class="timer" role="timer">3:00</span>
+          <span class="potential"><span id="potential-score">1000</span> puan</span>
+        </div>
+        <div class="time-bar"><div id="time-bar-fill" class="time-bar-fill"></div></div>
+      </header>
+
+      <article class="entry">
+        <h2 id="game-word" class="headword"></h2>
+        <div id="hint-list" class="hint-list"></div>
+      </article>
+
+      <form id="guess-form" class="guess-form" autocomplete="off">
+        <label for="guess-input" class="guess-label">Sence ne demek?</label>
+        <div class="guess-row">
+          <input id="guess-input" class="guess-input" type="text" maxlength="200" spellcheck="false" required>
+          <button id="guess-button" class="button" type="submit">Yaz</button>
+        </div>
+      </form>
+      <p id="guess-feedback" class="feedback" aria-live="polite"></p>
+      <ol id="guess-list" class="guess-list"></ol>
+    </section>
+
+    <section id="result-screen" class="screen result" hidden>
+      <p id="result-stamp" class="stamp"></p>
+
+      <article class="entry">
+        <h2 id="result-word" class="headword"></h2>
+        <p id="result-category" class="entry-line entry-category"></p>
+        <p id="result-parts" class="entry-line"></p>
+        <p id="result-definition" class="definition"></p>
+        <p id="result-sentence" class="entry-line entry-sentence"></p>
+      </article>
+
+      <dl class="tally">
+        <div class="tally-item tally-score"><dt>Puan</dt><dd id="result-score"></dd></div>
+        <div class="tally-item"><dt>Süre</dt><dd id="result-time"></dd></div>
+        <div class="tally-item"><dt>İpucu</dt><dd id="result-hints"></dd></div>
+        <div class="tally-item"><dt>Tahmin</dt><dd id="result-guesses"></dd></div>
+        <div class="tally-item"><dt>En yakın</dt><dd id="result-closeness"></dd></div>
+      </dl>
+
+      <button id="home-button" class="button" type="button">Ana sayfaya dön</button>
+    </section>
+
+    <p id="error-banner" class="error-banner" role="alert" hidden></p>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
