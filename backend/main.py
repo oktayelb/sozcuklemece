@@ -42,7 +42,7 @@ async def lifespan(app):
     yield
 
 
-app = FastAPI(title="Yeni Sözcükle-", lifespan=lifespan)
+app = FastAPI(title="Sözcüklemece", lifespan=lifespan)
 
 
 def find_game(request, game_id):

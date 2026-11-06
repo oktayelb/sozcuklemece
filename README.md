@@ -1,4 +1,4 @@
-kelimele
+sozcuklemece
 
 
 Tarayıcılar üzerinden oynanılan günlük oyunların arttığı bu dönemde yeni ve bambaşka bir bulmaca

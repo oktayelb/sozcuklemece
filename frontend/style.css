@@ -141,10 +141,6 @@ p {
   letter-spacing: -0.025em;
 }
 
-.logo-hyphen {
-  color: var(--pencil-red);
-}
-
 .logo-gloss {
   max-width: 26rem;
   margin-top: 1.1rem;

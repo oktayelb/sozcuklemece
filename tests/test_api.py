@@ -44,7 +44,7 @@ def test_today_reports_date_and_word_count(client):
 def test_frontend_is_served(client):
     response = client.get("/")
     assert response.status_code == 200
-    assert "Yeni Sözcükle" in response.text
+    assert "Sözcüklemece" in response.text
 
 
 def test_start_gives_word_and_hint_names_without_hint_contents(client):
