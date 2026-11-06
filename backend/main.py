@@ -9,7 +9,6 @@ from backend.game import (
     GAME_SECONDS,
     HINT_LABELS,
     HINT_PENALTY,
-    MAX_TIME_PENALTY,
     Game,
 )
 from backend.puzzles import (
@@ -77,7 +76,6 @@ def start_game(body: StartRequest, request: Request):
         hints=hint_options,
         duration_seconds=GAME_SECONDS,
         hint_penalty=HINT_PENALTY,
-        points_lost_per_second=MAX_TIME_PENALTY / GAME_SECONDS,
         remaining_seconds=game.remaining_seconds(now),
         score=game.current_score(now),
     )

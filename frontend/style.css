@@ -205,25 +205,13 @@ p {
   outline-offset: 3px;
 }
 
-.clock {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-}
-
 .timer {
+  display: block;
   font-size: 2.3rem;
   font-weight: 600;
   line-height: 1;
   font-variant-numeric: tabular-nums lining-nums;
   letter-spacing: -0.01em;
-}
-
-.potential {
-  color: var(--ink-soft);
-  font-size: 1.05rem;
-  font-style: italic;
-  font-variant-numeric: tabular-nums lining-nums;
 }
 
 .time-bar {

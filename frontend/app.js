@@ -4,11 +4,8 @@ const TICK_MILLISECONDS = 200;
 const game = {
   id: null,
   durationSeconds: 0,
-  pointsLostPerSecond: 0,
   hintPenalty: 0,
   deadline: 0,
-  scoreAtSync: 0,
-  remainingAtSync: 0,
   timerId: null,
   isStarting: false,
   isEnding: false,
@@ -96,17 +93,12 @@ function secondsRemaining() {
 
 function syncWithServer(response) {
   game.deadline = performance.now() + response.remaining_seconds * 1000;
-  game.scoreAtSync = response.score;
-  game.remainingAtSync = response.remaining_seconds;
 }
 
 function renderClock() {
   const remaining = secondsRemaining();
-  const secondsSinceSync = game.remainingAtSync - remaining;
-  const potentialScore = game.scoreAtSync - game.pointsLostPerSecond * secondsSinceSync;
 
   element("timer-text").textContent = formatClock(remaining);
-  element("potential-score").textContent = Math.round(potentialScore);
   element("time-bar-fill").style.width = `${(remaining / game.durationSeconds) * 100}%`;
   element("game-screen").classList.toggle("low-time", remaining <= LOW_TIME_SECONDS);
 }
@@ -232,7 +224,6 @@ async function startGame(slot) {
 
     game.id = started.game_id;
     game.durationSeconds = started.duration_seconds;
-    game.pointsLostPerSecond = started.points_lost_per_second;
     game.hintPenalty = started.hint_penalty;
     game.isEnding = false;
     syncWithServer(started);

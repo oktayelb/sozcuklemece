@@ -27,7 +27,6 @@ class StartResponse(BaseModel):
     hints: list[HintOption]
     duration_seconds: int
     hint_penalty: int
-    points_lost_per_second: float
     remaining_seconds: float
     score: int
 
