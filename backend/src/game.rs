@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use crate::puzzle::Puzzle;
 use crate::similarity::{Judgement, PreparedWord, WrongTurn, closeness_percent};
-use crate::text::{compact_text, normalize_text};
+use crate::text::{compact_text, fold_turkish_letters, normalize_text};
 
 pub const GAME_SECONDS: f64 = 180.0;
 pub const GAME_RESULT_GRACE_SECONDS: f64 = 120.0;
@@ -62,11 +62,11 @@ pub fn wrong_turn_note(wrong_turn: WrongTurn) -> &'static str {
 }
 
 pub fn repeats_the_word(guess: &str, puzzle: &Puzzle) -> bool {
-    let compact_guess = compact_text(guess);
+    let compact_guess = fold_turkish_letters(&compact_text(guess));
     let mut forbidden_forms = vec![&puzzle.word];
     forbidden_forms.extend(&puzzle.inflected_stems);
     for form in forbidden_forms {
-        let compact_form = compact_text(form);
+        let compact_form = fold_turkish_letters(&compact_text(form));
         if !compact_form.is_empty() && compact_guess.contains(&compact_form) {
             return true;
         }
@@ -599,6 +599,8 @@ mod tests {
             "sıyır gaç",
             "sıyır-gaç",
             "bu bir sıyırgaçtır",
+            "siyirgac",
+            "SIYIRGAC",
         ] {
             assert!(repeats_the_word(guess, &puzzle()), "{guess}");
         }

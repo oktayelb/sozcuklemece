@@ -3,6 +3,7 @@ FROM rust:1.96-bookworm AS build
 WORKDIR /build
 COPY Cargo.toml Cargo.lock ./
 COPY src ./src
+COPY resources ./resources
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/build/target \
     cargo build --release --locked --bin sozcuklemece-backend \

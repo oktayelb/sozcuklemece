@@ -4,7 +4,7 @@ use moka::future::Cache;
 
 use crate::encoder::{EncoderError, TeiEncoder};
 use crate::puzzle::Puzzle;
-use crate::text::normalize_text;
+use crate::text::{LetterRestorer, normalize_text};
 
 pub const WIN_SIMILARITY: f64 = 0.615;
 pub const ZERO_CLOSENESS_SIMILARITY: f64 = 0.15;
@@ -110,6 +110,7 @@ fn closest_similarity(vectors: &[Vec<f32>], guess_vector: &[f32]) -> f64 {
 pub struct MeaningJudge {
     encoder: TeiEncoder,
     guess_vectors: Cache<String, Arc<Vec<f32>>>,
+    letters: LetterRestorer,
 }
 
 impl MeaningJudge {
@@ -117,6 +118,7 @@ impl MeaningJudge {
         MeaningJudge {
             encoder,
             guess_vectors: Cache::new(GUESS_CACHE_SIZE),
+            letters: LetterRestorer::new(),
         }
     }
 
@@ -172,7 +174,9 @@ impl MeaningJudge {
         word: &PreparedWord,
         guess: &str,
     ) -> Result<Judgement, EncoderError> {
-        let guess_vector = self.encode_guess(normalize_text(guess)).await?;
+        let guess_vector = self
+            .encode_guess(self.letters.normalize_guess(guess))
+            .await?;
         Ok(word.compare(&guess_vector))
     }
 

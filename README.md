@@ -78,6 +78,10 @@ Doğruluğu örnek sözcüklerle ölçmek için TEI açıkken `backend` klasör�
     cargo run --release --bin evaluate_guesses
     cargo test -- --ignored
 
+`evaluate_guesses -- --plain-letters` aynı tahminleri Türkçe harfleri silinmiş olarak ölçer.
+
+Hiç Türkçe harf (ç, ğ, ı, ö, ş, ü) içermeyen bir tahmin İngilizce klavyeyle yazılmış sayılır. Arka uç her sözcüğü en sık kullanılan Türkçe yazımına çevirir ("geldigini" → "geldiğini"). Sözcük listesi `backend/resources/turkish_words.txt`, [FrequencyWords](https://github.com/hermitdave/FrequencyWords) OpenSubtitles 2018 Türkçe listesinin ilk 200 bin sözcüğünden üretildi (CC BY-SA 4.0). Örnek tahminlerde harfler silinince doğru tahminlerin kazanma oranı %76'dan %49'a düşüyordu, çeviriyle %75 oldu. Sözcüğün kendisi de Türkçe harfsiz yazılırsa yakalanır.
+
 Model derlenirken `ai/quantize.py` ile int8'e indirilir. Ağırlık çarpımları `ai/calibration_texts.txt` içindeki örnek tanımlarla önceden ölçeklenir (statik nicemleme). Ölçekler sabit olduğu için bir tahminin skoru aynı anda işlenen diğer tahminlere bağlı değildir. Dinamik nicemleme daha basittir ama TEI istekleri toplu işlediği için skorlar yüke göre oynuyordu. Model ya da nicemleme değişirse kazanma eşiği `evaluate_guesses` ile yeniden ayarlanmalı.
 
 Model en çok 75 parça (token) okur. Arka uç TEI'ye metni kesmemesini söyler: daha uzun bir tahmin sessizce kırpılmak yerine oyuncuya "çok uzun" diye geri döner, daha uzun bir tanım da yönetim sayfasında reddedilir. Olağan Türkçe metinde 200 karakter yaklaşık 40 parça eder.
