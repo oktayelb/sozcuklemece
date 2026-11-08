@@ -58,6 +58,10 @@ Oyun başlatılırken Cloudflare Turnstile ile doğrulama yapılır. Görünmez 
 
 Tarayıcı ilk açılışta rastgele bir oyuncu kimliği üretip `localStorage`'da saklar ve oyunu başlatırken gönderir. Arka uç her kimliğe o sözcük için tek oyun verir. Oyun sürerken yeniden başlatılırsa aynı oyun, açılmış ipuçları ve tahminlerle kaldığı yerden sürer. Oyun bittikten sonra yeni oyun yerine sonuç gösterilir. Sonuç ekranında oyuncu o sözcüğü oynayan herkesle karşılaştırılır: oyuncu sayısı, bulma oranı, ortalamalar, puan dağılımı ve oyuncunun kaç kişiyi geçtiği. Bu sayılar her biten oyunla birikerek güncellenir, veritabanı yoktur. Kayıtlar ve istatistikler bellekte durur, yeni sözcükle ya da arka uç yeniden başlayınca sıfırlanır. Kimlik tarayıcı verisiyle silinebildiği için bu bir hile engeli değil, dürüst oyuncu için bir kuraldır.
 
+## Sınırdaki tahminler ve itirazlar
+
+Eşiğe yaklaşıp (yakınlık %70 ve üstü) kazanamayan tahminler ve oyuncuların "Bence doğru" itirazları `/admin/` sayfasındaki listeye düşer. Oyuncu yakınlığı %50 ve üstü olan tahminlere oyun başına en çok 3 kez itiraz edebilir. Yönetici her tahmini doğru anlatım, zıt anlam ya da yanlış anlam olarak sözcüğe ekler ya da geçer. Ekleme sözcüğü hemen yeniden hazırlar ve dosyaya yazar. Süren oyunlar yeni haliyle devam eder, bugünkü oyuncular ve istatistikler silinmez. Liste yalnızca bellekte, o sözcük boyunca tutulur (en çok 300 tahmin). Bu liste, ileride modeli gerçek oyuncu tahminleriyle ölçmenin de kaynağı.
+
 ## Önbellek ve CDN
 
 nginx ön yüz dosyalarını önbellek başlıklarıyla sunar: HTML, JS ve CSS 5 dakika, yazı tipleri ve sesler 30 gün. `/api/` yanıtları hiç önbelleğe alınmaz. Önüne bir CDN (ör. Cloudflare) konursa nginx'e `set_real_ip_from` ve `real_ip_header` eklenmeli, yoksa bütün oyuncular CDN'in IP'si sayılır.

@@ -503,6 +503,28 @@ p {
   font-style: italic;
 }
 
+.appeal-button,
+.appeal-sent {
+  grid-column: 1 / -1;
+  justify-self: start;
+  font-size: 0.8rem;
+}
+
+.appeal-button {
+  padding: 0;
+  border: 0;
+  color: var(--pen-blue);
+  background: none;
+  font-family: var(--serif);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.appeal-sent {
+  color: var(--ink-soft);
+  font-style: italic;
+}
+
 .stamp {
   float: right;
   margin: 0.2rem 0 0.8rem 1rem;

@@ -7,6 +7,7 @@ pub mod game;
 pub mod players;
 pub mod puzzle;
 pub mod rate_limit;
+pub mod review;
 pub mod similarity;
 pub mod stats;
 pub mod test_guess_writer;

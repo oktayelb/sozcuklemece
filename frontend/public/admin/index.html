@@ -18,6 +18,16 @@
     </label>
     <p id="word-status" class="admin-status" role="status">Parolayı girince yayındaki sözcük görünür.</p>
 
+    <section class="admin-review">
+      <div class="admin-review-head">
+        <h2 class="admin-review-title">Sınırdaki tahminler</h2>
+        <button id="review-refresh" class="button" type="button">Yenile</button>
+      </div>
+      <p class="admin-help">Yayındaki sözcük için eşiğe yaklaşıp kazanamayan tahminler ve oyuncuların "Bence doğru" itirazları. Bir karar sözcüğü hemen günceller, süren oyunlar da yeni haliyle devam eder. Tahminler yalnızca bellekte, o sözcük boyunca tutulur.</p>
+      <p id="review-message" class="admin-message" role="status"></p>
+      <ol id="review-list" class="check-list"></ol>
+    </section>
+
     <form id="word-form" class="admin-form" autocomplete="off">
       <label class="admin-field">
         <span class="admin-label">Sözcük</span>

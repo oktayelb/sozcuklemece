@@ -12,10 +12,10 @@ use sozcuklemece_backend::rate_limit::{
 };
 use sozcuklemece_backend::similarity::HIGHEST_WIN_SIMILARITY;
 use support::{
-    ADMIN_TOKEN, CLAUDE_API_KEY, FAKE_TEI_MAX_WORDS, FakeClaude, FakeTeiMode, FakeTurnstileMode,
-    OTHER_ACTION_TURNSTILE_TOKEN, OTHER_SITE_TURNSTILE_TOKEN, PLAYER_IP,
+    ADMIN_TOKEN, ApiResponse, CLAUDE_API_KEY, FAKE_TEI_MAX_WORDS, FakeClaude, FakeTeiMode,
+    FakeTurnstileMode, OTHER_ACTION_TURNSTILE_TOKEN, OTHER_SITE_TURNSTILE_TOKEN, PLAYER_IP,
     TESTING_KEY_TURNSTILE_TOKEN, TURNSTILE_SITE_KEY, TestServer, VALID_TURNSTILE_TOKEN,
-    first_puzzle, game_day_noon, new_player_id, second_puzzle,
+    first_puzzle, game_day_noon, near_guess, new_player_id, second_puzzle,
 };
 
 const UNKNOWN_GUESS: &str = "bambaşka bir açıklama";
@@ -1306,4 +1306,185 @@ async fn failed_writing_is_reported() {
         .admin_post("/api/admin/word/test-guesses", &second_puzzle())
         .await;
     assert_eq!(response.status, StatusCode::BAD_GATEWAY);
+}
+
+async fn admin_get(server: &TestServer, path: &str) -> ApiResponse {
+    server
+        .call(Method::GET, path, None, &[("x-admin-token", ADMIN_TOKEN)])
+        .await
+}
+
+async fn decide(server: &TestServer, text: &str, verdict: &str) -> ApiResponse {
+    server
+        .call(
+            Method::POST,
+            "/api/admin/review",
+            Some(json!({ "text": text, "verdict": verdict })),
+            &[("x-admin-token", ADMIN_TOKEN)],
+        )
+        .await
+}
+
+async fn appeal(server: &TestServer, game_id: &str, guess_index: usize) -> ApiResponse {
+    server
+        .post(
+            &format!("/api/games/{game_id}/appeals"),
+            json!({ "guess_index": guess_index }),
+        )
+        .await
+}
+
+#[tokio::test]
+async fn close_guess_reaches_the_review_list() {
+    let server = TestServer::with_word().await;
+    let game_id = server.start_game_id().await;
+    let guess = near_guess(&first_puzzle().definition);
+    let body = server.guess(&game_id, &guess).await.body;
+    assert_eq!(body["won"], false);
+    assert_eq!(body["closeness"], 86);
+
+    let review = admin_get(&server, "/api/admin/review").await.body;
+    assert_eq!(review["word"], first_puzzle().word.as_str());
+    assert_eq!(review["items"][0]["text"], guess.as_str());
+    assert_eq!(review["items"][0]["seen"], 1);
+    assert_eq!(review["items"][0]["appeals"], 0);
+}
+
+#[tokio::test]
+async fn far_guess_does_not_reach_the_review_list() {
+    let server = TestServer::with_word().await;
+    let game_id = server.start_game_id().await;
+    server.guess(&game_id, UNKNOWN_GUESS).await;
+    let review = admin_get(&server, "/api/admin/review").await.body;
+    assert_eq!(review["items"], json!([]));
+}
+
+#[tokio::test]
+async fn player_can_appeal_a_close_guess_once() {
+    let server = TestServer::with_word().await;
+    let player_id = new_player_id();
+    let started = start_as(&server, &player_id).await;
+    assert_eq!(started["appeal_min_closeness"], 50);
+    let game_id = started["game_id"].as_str().unwrap().to_string();
+    let guess = near_guess(&first_puzzle().definition);
+    server.guess(&game_id, &guess).await;
+
+    let response = appeal(&server, &game_id, 0).await;
+    assert_eq!(response.status, StatusCode::OK, "{}", response.body);
+    assert_eq!(
+        appeal(&server, &game_id, 0).await.status,
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+
+    let review = admin_get(&server, "/api/admin/review").await.body;
+    assert_eq!(review["items"][0]["appeals"], 1);
+    let resumed = start_as(&server, &player_id).await;
+    assert_eq!(resumed["guesses"][0]["appealed"], true);
+}
+
+#[tokio::test]
+async fn far_guess_cannot_be_appealed() {
+    let server = TestServer::with_word().await;
+    let game_id = server.start_game_id().await;
+    server.guess(&game_id, UNKNOWN_GUESS).await;
+    assert_eq!(
+        appeal(&server, &game_id, 0).await.status,
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+    assert_eq!(
+        appeal(&server, &game_id, 7).await.status,
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+}
+
+#[tokio::test]
+async fn guess_marked_right_wins_in_running_games() {
+    let server = TestServer::with_word().await;
+    let player_id = new_player_id();
+    let game_id = start_as(&server, &player_id).await["game_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let guess = near_guess(&first_puzzle().definition);
+    server.guess(&game_id, &guess).await;
+
+    let response = decide(&server, &guess, "right").await;
+    assert_eq!(response.status, StatusCode::OK, "{}", response.body);
+    assert_eq!(response.body["items"], json!([]));
+
+    server.advance_clock(GUESS_INTERVAL_SECONDS);
+    let body = server.guess(&game_id, &guess).await.body;
+    assert_eq!(body["won"], true);
+    assert_eq!(
+        server.player_today(&player_id).await.body["state"],
+        "finished"
+    );
+}
+
+#[tokio::test]
+async fn guess_marked_opposite_says_so_and_survives_a_restart() {
+    let server = TestServer::with_word().await;
+    let game_id = server.start_game_id().await;
+    let guess = near_guess(&first_puzzle().definition);
+    server.guess(&game_id, &guess).await;
+
+    decide(&server, &guess, "opposite").await;
+
+    server.advance_clock(GUESS_INTERVAL_SECONDS);
+    let body = server.guess(&game_id, &guess).await.body;
+    assert_eq!(body["won"], false);
+    assert_eq!(body["note"], "Tersini söylüyor gibisin.");
+
+    let restarted = server.restarted(Clock::manual(game_day_noon())).await;
+    let live = restarted
+        .state
+        .word_store
+        .current_word(game_day_noon())
+        .unwrap();
+    assert!(live.word.puzzle.opposite_meanings.contains(&guess));
+}
+
+#[tokio::test]
+async fn dismissed_guess_leaves_the_list_and_the_word_alone() {
+    let server = TestServer::with_word().await;
+    let game_id = server.start_game_id().await;
+    let guess = near_guess(&first_puzzle().definition);
+    server.guess(&game_id, &guess).await;
+
+    let response = decide(&server, &guess, "dismiss").await;
+
+    assert_eq!(response.body["items"], json!([]));
+    let live = server
+        .state
+        .word_store
+        .current_word(game_day_noon())
+        .unwrap();
+    assert_eq!(live.word.puzzle, first_puzzle());
+}
+
+#[tokio::test]
+async fn editing_the_word_keeps_todays_players_and_stats() {
+    let server = TestServer::with_word().await;
+    let first_result = play_and_finish(&server, UNKNOWN_GUESS).await;
+    assert_eq!(first_result["stats"]["players"], 1);
+
+    let guess = near_guess(&first_puzzle().definition);
+    decide(&server, &guess, "right").await;
+
+    let second_result = play_and_finish(&server, UNKNOWN_GUESS).await;
+    assert_eq!(second_result["stats"]["players"], 2);
+}
+
+#[tokio::test]
+async fn review_needs_the_right_password() {
+    let server = TestServer::with_word().await;
+    let response = server
+        .call(
+            Method::GET,
+            "/api/admin/review",
+            None,
+            &[("x-admin-token", "yanlış")],
+        )
+        .await;
+    assert_eq!(response.status, StatusCode::UNAUTHORIZED);
 }

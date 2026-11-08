@@ -9,7 +9,7 @@ use chrono_tz::Europe::Istanbul;
 use serde::{Deserialize, Serialize};
 
 use crate::encoder::EncoderError;
-use crate::puzzle::Puzzle;
+use crate::puzzle::{MAX_LIST_LENGTH, Puzzle};
 use crate::similarity::{MeaningJudge, PreparedWord};
 
 pub const WORD_TTL_SECONDS: f64 = 24.0 * 60.0 * 60.0;
@@ -33,6 +33,7 @@ pub fn moment_in_game_timezone(unix_seconds: f64) -> String {
 pub enum StoreError {
     Encoder(EncoderError),
     File(io::Error),
+    ListFull,
 }
 
 impl fmt::Display for StoreError {
@@ -40,6 +41,7 @@ impl fmt::Display for StoreError {
         match self {
             StoreError::Encoder(error) => write!(formatter, "{error}"),
             StoreError::File(error) => write!(formatter, "sözcük dosyası: {error}"),
+            StoreError::ListFull => write!(formatter, "liste dolu"),
         }
     }
 }
@@ -93,6 +95,14 @@ fn delete_word_file(word_file: &Path) {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum MeaningSide {
+    Right,
+    Opposite,
+    Wrong,
+}
+
 #[derive(Clone)]
 pub struct LiveWord {
     pub word: Arc<PreparedWord>,
@@ -141,6 +151,48 @@ impl DailyWordStore {
         });
         self.judge.forget_guesses();
         Ok(())
+    }
+
+    pub async fn add_meaning(
+        &self,
+        side: MeaningSide,
+        text: &str,
+        now: f64,
+    ) -> Result<Option<Arc<PreparedWord>>, StoreError> {
+        let Some(live) = self.current_word(now) else {
+            return Ok(None);
+        };
+        let mut puzzle = live.word.puzzle.clone();
+        let list = match side {
+            MeaningSide::Right => &mut puzzle.also_accepted,
+            MeaningSide::Opposite => &mut puzzle.opposite_meanings,
+            MeaningSide::Wrong => &mut puzzle.wrong_meanings,
+        };
+        if !list.iter().any(|existing| existing == text) {
+            if list.len() >= MAX_LIST_LENGTH {
+                return Err(StoreError::ListFull);
+            }
+            list.push(text.to_string());
+        }
+
+        let mut word = self.judge.prepare(puzzle).await?;
+        word.keep_edition_of(&live.word);
+        let word = Arc::new(word);
+
+        let mut current = self.live.lock().unwrap();
+        let still_the_same_word = match current.as_ref() {
+            Some(current_word) => current_word.word.is_same_edition(&word),
+            None => false,
+        };
+        if !still_the_same_word {
+            return Ok(None);
+        }
+        save_word(&self.word_file, &word.puzzle, live.expires_at)?;
+        *current = Some(LiveWord {
+            word: word.clone(),
+            expires_at: live.expires_at,
+        });
+        Ok(Some(word))
     }
 
     pub fn drop_expired_word(&self, now: f64) {

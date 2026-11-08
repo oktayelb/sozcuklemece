@@ -17,6 +17,8 @@ pub const MIN_GUESS_LENGTH: usize = 3;
 pub const MAX_GUESS_LENGTH: usize = 200;
 pub const WIN_CLOSENESS: i64 = 100;
 pub const GUESS_INTERVAL_SECONDS: f64 = 2.0;
+pub const APPEAL_MIN_CLOSENESS: i64 = 50;
+pub const MAX_APPEALS_PER_GAME: usize = 3;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -133,6 +135,15 @@ pub struct JudgedGuess {
     pub closeness: i64,
     pub label: &'static str,
     pub note: Option<&'static str>,
+    pub appealed: bool,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum AppealRefusal {
+    NoSuchGuess,
+    NotAppealable,
+    AlreadyAppealed,
+    TooManyAppeals,
 }
 
 #[derive(Debug, PartialEq, Serialize)]
@@ -388,10 +399,43 @@ impl Game {
             closeness,
             label,
             note,
+            appealed: false,
         });
         let mut response = self.guess_response(now, label, Some(closeness), false);
         response.note = note;
         response
+    }
+
+    pub fn replace_word(&mut self, word: Arc<PreparedWord>) {
+        self.word = word;
+    }
+
+    fn appeals_used(&self) -> usize {
+        let mut used = 0;
+        for guess in &self.judged_guesses {
+            if guess.appealed {
+                used += 1;
+            }
+        }
+        used
+    }
+
+    pub fn appeal(&mut self, guess_index: usize) -> Result<JudgedGuess, AppealRefusal> {
+        let appeals_used = self.appeals_used();
+        let Some(guess) = self.judged_guesses.get_mut(guess_index) else {
+            return Err(AppealRefusal::NoSuchGuess);
+        };
+        if guess.closeness >= WIN_CLOSENESS || guess.closeness < APPEAL_MIN_CLOSENESS {
+            return Err(AppealRefusal::NotAppealable);
+        }
+        if guess.appealed {
+            return Err(AppealRefusal::AlreadyAppealed);
+        }
+        if appeals_used >= MAX_APPEALS_PER_GAME {
+            return Err(AppealRefusal::TooManyAppeals);
+        }
+        guess.appealed = true;
+        Ok(guess.clone())
     }
 
     pub fn outcome(&self) -> Outcome {
@@ -474,6 +518,43 @@ mod tests {
                 game.record_judged_guess(text, &judgement_of(similarity), now)
             }
         }
+    }
+
+    fn game_with_guesses(similarities: &[f64]) -> Game {
+        let mut game = new_game();
+        let mut now = START;
+        for (number, similarity) in similarities.iter().enumerate() {
+            submit(&mut game, &format!("tahmin {number}"), *similarity, now);
+            now += GUESS_INTERVAL_SECONDS;
+        }
+        game
+    }
+
+    #[test]
+    fn close_guess_can_be_appealed_once() {
+        let mut game = game_with_guesses(&[0.5]);
+        assert_eq!(game.appeal(0).unwrap().text, "tahmin 0");
+        assert!(game.judged_guesses()[0].appealed);
+        assert_eq!(game.appeal(0), Err(AppealRefusal::AlreadyAppealed));
+    }
+
+    #[test]
+    fn far_or_missing_guess_cannot_be_appealed() {
+        let mut game = game_with_guesses(&[0.2]);
+        assert_eq!(game.appeal(0), Err(AppealRefusal::NotAppealable));
+        assert_eq!(game.appeal(5), Err(AppealRefusal::NoSuchGuess));
+    }
+
+    #[test]
+    fn appeals_per_game_are_limited() {
+        let mut game = game_with_guesses(&[0.5; MAX_APPEALS_PER_GAME + 1]);
+        for index in 0..MAX_APPEALS_PER_GAME {
+            assert!(game.appeal(index).is_ok());
+        }
+        assert_eq!(
+            game.appeal(MAX_APPEALS_PER_GAME),
+            Err(AppealRefusal::TooManyAppeals)
+        );
     }
 
     #[test]

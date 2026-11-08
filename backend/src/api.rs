@@ -14,13 +14,15 @@ use subtle::ConstantTimeEq;
 
 use crate::clock::Clock;
 use crate::config::Config;
-use crate::daily_word::{DailyWordStore, StoreError, game_day, moment_in_game_timezone};
+use crate::daily_word::{
+    DailyWordStore, MeaningSide, StoreError, game_day, moment_in_game_timezone,
+};
 use crate::encoder::{EncoderError, TeiEncoder};
 use crate::game::{
-    FinishResponse, GAME_SECONDS, GUESS_INTERVAL_SECONDS, Game, GuessCheck, GuessResponse,
-    HINT_KINDS, HINT_PENALTY, HintKind, HintResponse, JudgedGuess, MAX_GUESS_LENGTH,
-    MAX_TIME_PENALTY, RevealedHint, WIN_CLOSENESS, game_result, remove_stale_games,
-    wrong_turn_note,
+    APPEAL_MIN_CLOSENESS, AppealRefusal, FinishResponse, GAME_SECONDS, GUESS_INTERVAL_SECONDS,
+    Game, GuessCheck, GuessResponse, HINT_KINDS, HINT_PENALTY, HintKind, HintResponse, JudgedGuess,
+    MAX_APPEALS_PER_GAME, MAX_GUESS_LENGTH, MAX_TIME_PENALTY, RevealedHint, WIN_CLOSENESS,
+    game_result, remove_stale_games, wrong_turn_note,
 };
 use crate::players::{PlayerDay, TodaysPlayers, is_valid_player_id};
 use crate::puzzle::Puzzle;
@@ -29,6 +31,7 @@ use crate::rate_limit::{
     GUESS_WINDOW_SECONDS, HINT_LIMIT, HINT_WINDOW_SECONDS, RESULT_LIMIT, RESULT_WINDOW_SECONDS,
     RateLimiter, UNKNOWN_CLIENT, rate_limit_key,
 };
+use crate::review::{ReviewItem, ReviewQueue};
 use crate::similarity::{MeaningJudge, PreparedWord, WIN_SIMILARITY};
 use crate::stats::StatsSummary;
 use crate::test_guess_writer::{TestGuessWriter, TestGuesses};
@@ -43,6 +46,7 @@ pub struct AppState {
     pub word_store: DailyWordStore,
     pub games: Mutex<HashMap<String, Game>>,
     pub players: Mutex<TodaysPlayers>,
+    pub review: Mutex<ReviewQueue>,
     turnstile: TurnstileVerifier,
     test_guess_writer: Option<TestGuessWriter>,
     game_start_limiter: Mutex<RateLimiter>,
@@ -75,6 +79,7 @@ impl AppState {
             word_store,
             games: Mutex::new(HashMap::new()),
             players: Mutex::new(TodaysPlayers::new()),
+            review: Mutex::new(ReviewQueue::new()),
             turnstile,
             test_guess_writer,
             game_start_limiter: Mutex::new(RateLimiter::new(
@@ -137,6 +142,9 @@ impl From<StoreError> for ApiError {
             StoreError::File(error) => {
                 eprintln!("Sözcük kaydedilemedi: {error}");
                 ApiError::ServerFailed
+            }
+            StoreError::ListFull => {
+                ApiError::InvalidInput("Bu liste dolu, eklenemedi.".to_string())
             }
         }
     }
@@ -319,6 +327,8 @@ struct StartResponse {
     duration_seconds: i64,
     hint_penalty: i64,
     max_time_penalty: i64,
+    appeal_min_closeness: i64,
+    max_appeals: usize,
     guess_interval_seconds: f64,
     remaining_seconds: f64,
     score: i64,
@@ -361,6 +371,37 @@ struct HintRequest {
 #[derive(Deserialize)]
 struct GuessRequest {
     text: String,
+}
+
+#[derive(Deserialize)]
+struct AppealRequest {
+    guess_index: usize,
+}
+
+#[derive(Serialize)]
+struct AppealResponse {
+    appealed: bool,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum ReviewVerdict {
+    Right,
+    Opposite,
+    Wrong,
+    Dismiss,
+}
+
+#[derive(Deserialize)]
+struct ReviewDecision {
+    text: String,
+    verdict: ReviewVerdict,
+}
+
+#[derive(Serialize)]
+struct ReviewResponse {
+    word: Option<String>,
+    items: Vec<ReviewItem>,
 }
 
 fn word_status(state: &AppState) -> WordStatusResponse {
@@ -536,6 +577,8 @@ fn start_response(game: &Game, now: f64) -> StartResponse {
         duration_seconds: GAME_SECONDS as i64,
         hint_penalty: HINT_PENALTY,
         max_time_penalty: MAX_TIME_PENALTY as i64,
+        appeal_min_closeness: APPEAL_MIN_CLOSENESS,
+        max_appeals: MAX_APPEALS_PER_GAME,
         guess_interval_seconds: GUESS_INTERVAL_SECONDS,
         remaining_seconds: game.remaining_seconds(now),
         score: game.current_score(now),
@@ -738,7 +781,117 @@ async fn submit_guess(
     };
     let response = game.record_judged_guess(&body.text, &judgement, now);
     state.players.lock().unwrap().record_finish(game);
+    if !response.won
+        && let Some(closeness) = response.closeness
+    {
+        let key = state.judge.normalize_guess(&body.text);
+        state.review.lock().unwrap().record_close_call(
+            word_to_judge.edition(),
+            &key,
+            &body.text,
+            closeness,
+        );
+    }
     Ok(Json(response))
+}
+
+async fn appeal_guess(
+    State(state): State<Arc<AppState>>,
+    client: Client,
+    Path(game_id): Path<String>,
+    Json(body): Json<AppealRequest>,
+) -> Result<Json<AppealResponse>, ApiError> {
+    enforce_rate_limit(
+        &state.result_limiter,
+        &client.rate_limit_key,
+        state.clock.monotonic_seconds(),
+    )?;
+    let mut games = state.games.lock().unwrap();
+    let Some(game) = games.get_mut(&game_id) else {
+        return Err(ApiError::GameNotFound);
+    };
+    let guess = match game.appeal(body.guess_index) {
+        Ok(guess) => guess,
+        Err(AppealRefusal::TooManyAppeals) => {
+            return Err(ApiError::InvalidInput(
+                "Bu oyunda itiraz hakkın bitti.".to_string(),
+            ));
+        }
+        Err(_) => {
+            return Err(ApiError::InvalidInput(
+                "Bu tahmine itiraz edilemez.".to_string(),
+            ));
+        }
+    };
+    let key = state.judge.normalize_guess(&guess.text);
+    state.review.lock().unwrap().record_appeal(
+        game.word.edition(),
+        &key,
+        &guess.text,
+        guess.closeness,
+    );
+    Ok(Json(AppealResponse { appealed: true }))
+}
+
+fn review_response(state: &AppState) -> ReviewResponse {
+    let Some(live) = state.word_store.current_word(state.clock.unix_seconds()) else {
+        return ReviewResponse {
+            word: None,
+            items: Vec::new(),
+        };
+    };
+    ReviewResponse {
+        word: Some(live.word.puzzle.word.clone()),
+        items: state.review.lock().unwrap().items(live.word.edition()),
+    }
+}
+
+async fn get_review(_: AdminAccess, State(state): State<Arc<AppState>>) -> Json<ReviewResponse> {
+    Json(review_response(&state))
+}
+
+async fn decide_review(
+    _: AdminAccess,
+    State(state): State<Arc<AppState>>,
+    Json(decision): Json<ReviewDecision>,
+) -> Result<Json<ReviewResponse>, ApiError> {
+    let text = decision.text.trim().to_string();
+    let length = text.chars().count();
+    if length == 0 || length > MAX_GUESS_LENGTH {
+        return Err(ApiError::InvalidInput(
+            "Tahmin boş ya da çok uzun.".to_string(),
+        ));
+    }
+    let Some(live) = state.word_store.current_word(state.clock.unix_seconds()) else {
+        return Err(ApiError::WordNotReady);
+    };
+    let side = match decision.verdict {
+        ReviewVerdict::Right => Some(MeaningSide::Right),
+        ReviewVerdict::Opposite => Some(MeaningSide::Opposite),
+        ReviewVerdict::Wrong => Some(MeaningSide::Wrong),
+        ReviewVerdict::Dismiss => None,
+    };
+    if let Some(side) = side {
+        let added = state
+            .word_store
+            .add_meaning(side, &text, state.clock.unix_seconds())
+            .await?;
+        let Some(edited_word) = added else {
+            return Err(ApiError::WordNotReady);
+        };
+        let mut games = state.games.lock().unwrap();
+        for game in games.values_mut() {
+            if game.word.is_same_edition(&edited_word) {
+                game.replace_word(edited_word.clone());
+            }
+        }
+    }
+    state
+        .review
+        .lock()
+        .unwrap()
+        .remove(live.word.edition(), &decision.text);
+    Ok(Json(review_response(&state)))
 }
 
 async fn finish_game(
@@ -776,5 +929,7 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/api/games/{game_id}/hints", post(reveal_hint))
         .route("/api/games/{game_id}/guesses", post(submit_guess))
         .route("/api/games/{game_id}/finish", post(finish_game))
+        .route("/api/games/{game_id}/appeals", post(appeal_guess))
+        .route("/api/admin/review", get(get_review).post(decide_review))
         .with_state(state)
 }

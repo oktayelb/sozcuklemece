@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use moka::future::Cache;
+use uuid::Uuid;
 
 use crate::encoder::{EncoderError, TeiEncoder};
 use crate::puzzle::Puzzle;
@@ -67,6 +68,7 @@ pub struct PreparedWord {
     opposite_vectors: Vec<Vec<f32>>,
     other_meaning_vectors: Vec<Vec<f32>>,
     win_similarity: f64,
+    edition: String,
 }
 
 impl PreparedWord {
@@ -82,7 +84,20 @@ impl PreparedWord {
             opposite_vectors,
             other_meaning_vectors,
             win_similarity: WIN_SIMILARITY,
+            edition: Uuid::new_v4().simple().to_string(),
         }
+    }
+
+    pub fn edition(&self) -> &str {
+        &self.edition
+    }
+
+    pub fn is_same_edition(&self, other: &PreparedWord) -> bool {
+        self.edition == other.edition
+    }
+
+    pub fn keep_edition_of(&mut self, earlier: &PreparedWord) {
+        self.edition = earlier.edition.clone();
     }
 
     pub fn win_similarity(&self) -> f64 {
@@ -214,6 +229,10 @@ impl MeaningJudge {
             .encode_guess(self.letters.normalize_guess(guess))
             .await?;
         Ok(word.compare(&guess_vector))
+    }
+
+    pub fn normalize_guess(&self, guess: &str) -> String {
+        self.letters.normalize_guess(guess)
     }
 
     pub async fn similarity(&self, word: &PreparedWord, guess: &str) -> Result<f64, EncoderError> {

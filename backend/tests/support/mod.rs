@@ -25,6 +25,7 @@ use sozcuklemece_backend::api::{AppState, router};
 use sozcuklemece_backend::clock::Clock;
 use sozcuklemece_backend::config::Config;
 use sozcuklemece_backend::puzzle::Puzzle;
+use sozcuklemece_backend::text::normalize_text;
 
 pub const ADMIN_TOKEN: &str = "deneme-parolasi";
 pub const CLIENT_IP_HEADER: &str = "x-real-ip";
@@ -81,6 +82,8 @@ struct FakeTeiState {
 }
 
 pub const FAKE_TEI_MAX_WORDS: usize = 75;
+pub const NEAR_GUESS_PREFIX: &str = "neredeyse ";
+const NEAR_GUESS_SIMILARITY: f32 = 0.55;
 
 #[derive(Deserialize)]
 struct EmbedRequest {
@@ -120,17 +123,34 @@ async fn fake_embed(
     let mut memory = state.memory.lock().unwrap();
     let mut vectors = Vec::new();
     for text in request.inputs {
-        let next_position = memory.position_of_text.len();
-        let position = *memory
-            .position_of_text
-            .entry(text.clone())
-            .or_insert(next_position);
-        memory.encoded_texts.push(text);
+        let position = memory.position_of(&text);
         let mut vector = vec![0.0f32; VECTOR_SIZE];
-        vector[position] = 1.0;
+        match text.strip_prefix(NEAR_GUESS_PREFIX) {
+            Some(meaning) => {
+                let meaning_position = memory.position_of(meaning);
+                vector[meaning_position] = NEAR_GUESS_SIMILARITY;
+                vector[position] = (1.0 - NEAR_GUESS_SIMILARITY * NEAR_GUESS_SIMILARITY).sqrt();
+            }
+            None => vector[position] = 1.0,
+        }
+        memory.encoded_texts.push(text);
         vectors.push(vector);
     }
     Json(vectors).into_response()
+}
+
+impl FakeTeiMemory {
+    fn position_of(&mut self, text: &str) -> usize {
+        let next_position = self.position_of_text.len();
+        *self
+            .position_of_text
+            .entry(text.to_string())
+            .or_insert(next_position)
+    }
+}
+
+pub fn near_guess(meaning: &str) -> String {
+    format!("{NEAR_GUESS_PREFIX}{}", normalize_text(meaning))
 }
 
 pub struct FakeTei {

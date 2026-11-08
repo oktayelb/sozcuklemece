@@ -229,7 +229,87 @@ function checkWord() {
   });
 }
 
+const REVIEW_VERDICTS = [
+  ["right", "Doğru say"],
+  ["opposite", "Zıt anlam"],
+  ["wrong", "Yanlış anlam"],
+  ["dismiss", "Geç"],
+];
+
+function reviewDetails(item) {
+  const parts = [`%${item.closeness}`];
+  if (item.appeals > 0) {
+    parts.push(`${item.appeals} itiraz`);
+  }
+  if (item.seen > 1) {
+    parts.push(`${item.seen} kez`);
+  }
+  return parts.join(" · ");
+}
+
+function buildReviewRow(item) {
+  const row = document.createElement("li");
+  row.className = item.appeals > 0 ? "check-row check-row-off" : "check-row";
+
+  const mark = document.createElement("span");
+  mark.className = "check-mark";
+  mark.textContent = item.appeals > 0 ? "!" : "·";
+
+  const text = document.createElement("span");
+  text.className = "check-text";
+  text.textContent = item.text;
+
+  const details = document.createElement("span");
+  details.className = "check-verdict";
+  details.textContent = reviewDetails(item);
+
+  const actions = document.createElement("span");
+  actions.className = "review-actions";
+  for (const [verdict, label] of REVIEW_VERDICTS) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "check-move";
+    button.textContent = label;
+    button.addEventListener("click", () => decideReview(item.text, verdict));
+    actions.append(button);
+  }
+
+  row.append(mark, text, details, actions);
+  return row;
+}
+
+function renderReview(review) {
+  const message = element("review-message");
+  if (review.word === null) {
+    message.textContent = "Yayında sözcük yok.";
+  } else if (review.items.length === 0) {
+    message.textContent = `${review.word} için bekleyen tahmin yok.`;
+  } else {
+    message.textContent = `${review.word} için ${review.items.length} tahmin bekliyor.`;
+  }
+  element("review-list").replaceChildren(...review.items.map(buildReviewRow));
+}
+
+async function refreshReview() {
+  try {
+    renderReview(await callAdminApi("GET", "/api/admin/review"));
+  } catch (error) {
+    element("review-message").textContent = error.message;
+  }
+}
+
+async function decideReview(text, verdict) {
+  element("review-message").textContent = "Kaydediliyor…";
+  try {
+    renderReview(await callAdminApi("POST", "/api/admin/review", { text, verdict }));
+  } catch (error) {
+    element("review-message").textContent = error.message;
+  }
+}
+
 element("admin-token").addEventListener("change", refreshStatus);
+element("admin-token").addEventListener("change", refreshReview);
+element("review-refresh").addEventListener("click", refreshReview);
 element("write-tests-button").addEventListener("click", writeTestGuesses);
 element("check-button").addEventListener("click", checkWord);
 element("word-form").addEventListener("submit", publishWord);

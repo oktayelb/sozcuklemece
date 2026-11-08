@@ -50,7 +50,7 @@ impl TodaysPlayers {
 
     fn is_tracking(&self, word: &Arc<PreparedWord>) -> bool {
         match &self.word {
-            Some(tracked_word) => Arc::ptr_eq(tracked_word, word),
+            Some(tracked_word) => tracked_word.is_same_edition(word),
             None => false,
         }
     }
@@ -218,6 +218,19 @@ mod tests {
 
         assert_eq!(players.day_of(PLAYER), None);
         assert_eq!(players.player_count(), 0);
+    }
+
+    #[test]
+    fn edited_word_keeps_who_played() {
+        let mut players = TodaysPlayers::new();
+        let word = prepared_word();
+        started_game(&mut players, &word);
+        let mut edited = PreparedWord::new(word.puzzle.clone(), vec![], vec![], vec![]);
+        edited.keep_edition_of(&word);
+
+        players.follow_word(&Arc::new(edited));
+
+        assert!(players.day_of(PLAYER).is_some());
     }
 
     #[test]

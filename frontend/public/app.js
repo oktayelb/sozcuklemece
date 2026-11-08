@@ -16,6 +16,9 @@ const game = {
   guessIntervalSeconds: 0,
   nextGuessAt: 0,
   lastCloseness: null,
+  judgedCount: 0,
+  appealMinCloseness: 0,
+  appealsLeft: 0,
   deadline: 0,
   timerId: null,
   isStarting: false,
@@ -375,7 +378,55 @@ function closenessChange(closeness) {
   return change;
 }
 
-function addGuessToList(text, closeness, label, change, note) {
+function canAppeal(closeness) {
+  return closeness >= game.appealMinCloseness && closeness < 100;
+}
+
+function removeAppealButtons() {
+  for (const button of document.querySelectorAll(".appeal-button")) {
+    button.remove();
+  }
+}
+
+async function appealGuess(guessIndex, button) {
+  button.disabled = true;
+  try {
+    await callApi(`/api/games/${game.id}/appeals`, { guess_index: guessIndex });
+    game.appealsLeft -= 1;
+    const sent = document.createElement("span");
+    sent.className = "appeal-sent";
+    sent.textContent = "İtirazın iletildi";
+    button.replaceWith(sent);
+    if (game.appealsLeft <= 0) {
+      removeAppealButtons();
+    }
+  } catch (error) {
+    button.disabled = false;
+    element("guess-feedback").textContent = requestFailureMessage(error, "İtiraz gönderilemedi.");
+  }
+}
+
+function buildAppealPart(guessIndex, closeness, appealed) {
+  if (appealed) {
+    const sent = document.createElement("span");
+    sent.className = "appeal-sent";
+    sent.textContent = "İtirazın iletildi";
+    return sent;
+  }
+  if (!canAppeal(closeness) || game.appealsLeft <= 0) {
+    return null;
+  }
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "appeal-button";
+  button.textContent = "Bence doğru";
+  button.addEventListener("click", () => appealGuess(guessIndex, button));
+  return button;
+}
+
+function addGuessToList(text, closeness, label, change, note, appealed) {
+  const guessIndex = game.judgedCount;
+  game.judgedCount += 1;
   const item = document.createElement("li");
   item.className = "guess-item";
 
@@ -406,6 +457,10 @@ function addGuessToList(text, closeness, label, change, note) {
     noteLine.className = "guess-note";
     noteLine.textContent = note;
     item.append(noteLine);
+  }
+  const appealPart = buildAppealPart(guessIndex, closeness, appealed);
+  if (appealPart !== null) {
+    item.append(appealPart);
   }
   element("guess-list").prepend(item);
 }
@@ -443,7 +498,7 @@ async function submitGuess(event) {
     } else {
       const change = closenessChange(response.closeness);
       element("guess-feedback").textContent = feedbackText(response.message, change, response.note);
-      addGuessToList(text, response.closeness, response.message, change, response.note);
+      addGuessToList(text, response.closeness, response.message, change, response.note, false);
       input.value = "";
       renderGuessLength();
     }
@@ -479,11 +534,14 @@ async function startGame() {
     syncWithServer(started);
 
     element("game-word").textContent = started.word;
+    game.appealMinCloseness = started.appeal_min_closeness;
+    game.appealsLeft = started.max_appeals - started.guesses.filter((guess) => guess.appealed).length;
     element("guess-list").replaceChildren();
     game.lastCloseness = null;
+    game.judgedCount = 0;
     for (const guess of started.guesses) {
       const change = closenessChange(guess.closeness);
-      addGuessToList(guess.text, guess.closeness, guess.label, change, guess.note);
+      addGuessToList(guess.text, guess.closeness, guess.label, change, guess.note, guess.appealed);
     }
     element("guess-feedback").textContent = "";
     element("guess-input").value = "";

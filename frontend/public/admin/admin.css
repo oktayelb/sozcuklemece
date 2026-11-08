@@ -146,3 +146,30 @@
   text-decoration: underline;
   cursor: pointer;
 }
+
+.admin-review {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 1.8rem;
+  padding-top: 1rem;
+  border-top: 3px double var(--ink);
+}
+
+.admin-review-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.admin-review-title {
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  grid-column: 2 / -1;
+  gap: 0.2rem 1rem;
+}
