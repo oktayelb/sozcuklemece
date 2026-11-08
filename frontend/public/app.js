@@ -458,9 +458,73 @@ function renderResult(result) {
   element("result-hints").textContent = result.hints_used;
   element("result-guesses").textContent = result.guess_count;
   element("result-closeness").textContent = `%${result.best_closeness}`;
+  renderCrowd(result.stats, result.score);
 
   clearError();
   showScreen("result-screen");
+}
+
+function rankText(stats) {
+  if (stats.better_than_percent === null) {
+    return "Bugün oynayan ilk kişi sensin.";
+  }
+  return `Diğer oyuncuların yüzde ${stats.better_than_percent} kadarından yüksek puan aldın.`;
+}
+
+function bucketLabel(bucket) {
+  if (bucket.max_score === 0) {
+    return "Bulamadı";
+  }
+  return `${bucket.min_score}–${bucket.max_score}`;
+}
+
+function buildBucketRow(bucket, mostPlayers, isMine) {
+  const row = document.createElement("li");
+  row.className = isMine ? "crowd-bucket crowd-bucket-mine" : "crowd-bucket";
+
+  const label = document.createElement("span");
+  label.className = "crowd-bucket-label";
+  label.textContent = bucketLabel(bucket);
+
+  const bar = document.createElement("span");
+  bar.className = "crowd-bar";
+  const barFill = document.createElement("span");
+  barFill.className = "crowd-bar-fill";
+  barFill.style.width = `${(bucket.players / mostPlayers) * 100}%`;
+  bar.append(barFill);
+
+  const count = document.createElement("span");
+  count.className = "crowd-bucket-count";
+  count.textContent = isMine ? `${bucket.players} · sen` : `${bucket.players}`;
+
+  row.append(label, bar, count);
+  return row;
+}
+
+function renderCrowd(stats, myScore) {
+  const crowd = element("crowd");
+  if (!stats) {
+    crowd.hidden = true;
+    return;
+  }
+  element("crowd-rank").textContent = rankText(stats);
+  element("crowd-players").textContent = stats.players;
+  element("crowd-win").textContent = `%${stats.win_percent}`;
+  element("crowd-score").textContent = stats.average_score;
+  element("crowd-guesses").textContent = stats.average_guesses.toLocaleString("tr-TR");
+  if (stats.average_winning_seconds === null) {
+    element("crowd-time").textContent = "–";
+  } else {
+    element("crowd-time").textContent = formatClock(stats.average_winning_seconds);
+  }
+
+  const mostPlayers = Math.max(1, ...stats.score_buckets.map((bucket) => bucket.players));
+  const rows = stats.score_buckets.map((bucket) => {
+    const isMine = myScore >= bucket.min_score && myScore <= bucket.max_score;
+    return buildBucketRow(bucket, mostPlayers, isMine);
+  });
+  element("crowd-buckets").replaceChildren(...rows);
+  crowd.hidden = false;
 }
 
 element("play-button").addEventListener("click", onPlayButton);

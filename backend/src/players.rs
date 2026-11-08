@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use crate::game::{Game, Outcome};
 use crate::similarity::PreparedWord;
+use crate::stats::{StatsSummary, WordStats};
 
 pub const MIN_PLAYER_ID_LENGTH: usize = 16;
 pub const MAX_PLAYER_ID_LENGTH: usize = 64;
@@ -29,6 +30,7 @@ pub enum PlayerDay {
 pub struct TodaysPlayers {
     word: Option<Arc<PreparedWord>>,
     days: HashMap<String, PlayerDay>,
+    stats: WordStats,
 }
 
 impl Default for TodaysPlayers {
@@ -42,6 +44,7 @@ impl TodaysPlayers {
         TodaysPlayers {
             word: None,
             days: HashMap::new(),
+            stats: WordStats::default(),
         }
     }
 
@@ -58,6 +61,7 @@ impl TodaysPlayers {
         }
         self.word = Some(word.clone());
         self.days.clear();
+        self.stats = WordStats::default();
     }
 
     pub fn day_of(&self, player_id: &str) -> Option<PlayerDay> {
@@ -82,10 +86,24 @@ impl TodaysPlayers {
         if self.days.get(&game.player_id) != Some(&expected_day) {
             return;
         }
-        let day = PlayerDay::Finished {
-            outcome: game.outcome(),
-        };
-        self.days.insert(game.player_id.clone(), day);
+        let outcome = game.outcome();
+        self.stats.add(&outcome);
+        self.days
+            .insert(game.player_id.clone(), PlayerDay::Finished { outcome });
+    }
+
+    pub fn stats_for(&self, outcome: &Outcome) -> StatsSummary {
+        self.stats.summary_for(outcome)
+    }
+
+    pub fn stats_for_game(&self, game: &Game) -> Option<StatsSummary> {
+        if !self.is_tracking(&game.word) {
+            return None;
+        }
+        match self.days.get(&game.player_id) {
+            Some(PlayerDay::Finished { outcome }) => Some(self.stats_for(outcome)),
+            _ => None,
+        }
     }
 
     pub fn player_count(&self) -> usize {
@@ -167,6 +185,25 @@ mod tests {
                 outcome: game.outcome()
             })
         );
+    }
+
+    #[test]
+    fn finished_game_is_counted_in_the_stats_once() {
+        let mut players = TodaysPlayers::new();
+        let mut game = started_game(&mut players, &prepared_word());
+        game.finish(START + 10.0, false);
+
+        players.record_finish(&game);
+        players.record_finish(&game);
+
+        assert_eq!(players.stats_for_game(&game).unwrap().players, 1);
+    }
+
+    #[test]
+    fn running_game_has_no_stats() {
+        let mut players = TodaysPlayers::new();
+        let game = started_game(&mut players, &prepared_word());
+        assert_eq!(players.stats_for_game(&game), None);
     }
 
     #[test]

@@ -56,7 +56,7 @@ Oyun başlatılırken Cloudflare Turnstile ile doğrulama yapılır. Görünmez 
 
 ## Günde bir oyun
 
-Tarayıcı ilk açılışta rastgele bir oyuncu kimliği üretip `localStorage`'da saklar ve oyunu başlatırken gönderir. Arka uç her kimliğe o sözcük için tek oyun verir. Oyun sürerken yeniden başlatılırsa aynı oyun, açılmış ipuçları ve tahminlerle kaldığı yerden sürer. Oyun bittikten sonra yeni oyun yerine sonuç gösterilir. Kayıtlar bellekte durur ve yeni sözcükle sıfırlanır. Kimlik tarayıcı verisiyle silinebildiği için bu bir hile engeli değil, dürüst oyuncu için bir kuraldır.
+Tarayıcı ilk açılışta rastgele bir oyuncu kimliği üretip `localStorage`'da saklar ve oyunu başlatırken gönderir. Arka uç her kimliğe o sözcük için tek oyun verir. Oyun sürerken yeniden başlatılırsa aynı oyun, açılmış ipuçları ve tahminlerle kaldığı yerden sürer. Oyun bittikten sonra yeni oyun yerine sonuç gösterilir. Sonuç ekranında oyuncu o sözcüğü oynayan herkesle karşılaştırılır: oyuncu sayısı, bulma oranı, ortalamalar, puan dağılımı ve oyuncunun kaç kişiyi geçtiği. Bu sayılar her biten oyunla birikerek güncellenir, veritabanı yoktur. Kayıtlar ve istatistikler bellekte durur, yeni sözcükle ya da arka uç yeniden başlayınca sıfırlanır. Kimlik tarayıcı verisiyle silinebildiği için bu bir hile engeli değil, dürüst oyuncu için bir kuraldır.
 
 ## Önbellek ve CDN
 

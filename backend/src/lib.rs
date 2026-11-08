@@ -8,5 +8,6 @@ pub mod players;
 pub mod puzzle;
 pub mod rate_limit;
 pub mod similarity;
+pub mod stats;
 pub mod text;
 pub mod turnstile;

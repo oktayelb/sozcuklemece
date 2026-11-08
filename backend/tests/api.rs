@@ -1039,3 +1039,67 @@ async fn player_status_without_a_word_is_not_found() {
         StatusCode::NOT_FOUND
     );
 }
+
+async fn play_and_finish(server: &TestServer, guess: &str) -> Value {
+    let game_id = server.start_game_id().await;
+    server.guess(&game_id, guess).await;
+    server.finish(&game_id).await.body
+}
+
+#[tokio::test]
+async fn result_compares_the_player_with_everyone_today() {
+    let server = TestServer::with_word().await;
+    play_and_finish(&server, UNKNOWN_GUESS).await;
+    play_and_finish(&server, UNKNOWN_GUESS).await;
+
+    let winner = play_and_finish(&server, &first_puzzle().definition).await;
+
+    let stats = &winner["stats"];
+    assert_eq!(stats["players"], 3);
+    assert_eq!(stats["win_percent"], 33);
+    assert_eq!(stats["better_than_percent"], 100);
+    assert_eq!(stats["average_winning_seconds"], 0);
+    assert_eq!(stats["score_buckets"][0]["players"], 2);
+    assert_eq!(winner["won"], true);
+}
+
+#[tokio::test]
+async fn player_status_shows_stats_that_keep_growing() {
+    let server = TestServer::with_word().await;
+    let player_id = new_player_id();
+    let game_id = start_as(&server, &player_id).await["game_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    server.finish(&game_id).await;
+    play_and_finish(&server, &first_puzzle().definition).await;
+
+    let status = server.player_today(&player_id).await.body;
+
+    assert_eq!(status["result"]["stats"]["players"], 2);
+    assert_eq!(status["result"]["stats"]["better_than_percent"], 0);
+}
+
+#[tokio::test]
+async fn new_word_starts_fresh_stats() {
+    let server = TestServer::with_word().await;
+    play_and_finish(&server, UNKNOWN_GUESS).await;
+
+    server.publish(&second_puzzle()).await;
+
+    let result = play_and_finish(&server, UNKNOWN_GUESS).await;
+    assert_eq!(result["stats"]["players"], 1);
+}
+
+#[tokio::test]
+async fn game_of_a_replaced_word_has_no_stats() {
+    let server = TestServer::with_word().await;
+    let game_id = server.start_game_id().await;
+    server.publish(&second_puzzle()).await;
+    server.start_game().await;
+
+    let result = server.finish(&game_id).await.body;
+
+    assert_eq!(result["stats"], Value::Null);
+    assert_eq!(result["word"], first_puzzle().word.as_str());
+}

@@ -505,6 +505,78 @@ p {
   line-height: 1;
 }
 
+.crowd {
+  margin: -0.4rem 0 1.8rem;
+}
+
+.crowd-title {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.crowd-rank {
+  margin-top: 0.3rem;
+  color: var(--pen-blue);
+  font-family: var(--hand);
+  font-size: 1.45rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.tally-crowd {
+  margin: 0.9rem 0 1rem;
+  border-top-width: 1px;
+  border-top-style: solid;
+}
+
+.tally-crowd dd {
+  font-size: 1.15rem;
+}
+
+.crowd-buckets {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.crowd-bucket {
+  display: grid;
+  grid-template-columns: 5.6rem minmax(0, 1fr) 4.2rem;
+  gap: 0.8rem;
+  align-items: center;
+  padding: 0.18rem 0;
+  color: var(--ink-soft);
+  font-size: 0.86rem;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+.crowd-bar {
+  display: block;
+  height: 10px;
+}
+
+.crowd-bar-fill {
+  display: block;
+  min-width: 2px;
+  height: 100%;
+  background: repeating-linear-gradient(115deg, var(--ink-soft) 0 2px, transparent 2px 4px);
+}
+
+.crowd-bucket-count {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.crowd-bucket-mine {
+  color: var(--pencil-red);
+  font-weight: 600;
+}
+
+.crowd-bucket-mine .crowd-bar-fill {
+  background: repeating-linear-gradient(115deg, var(--pencil-red) 0 2px, transparent 2px 4px);
+}
+
 .error-banner {
   margin-top: 1.5rem;
   color: var(--pencil-red);

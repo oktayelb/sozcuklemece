@@ -29,6 +29,7 @@ use crate::rate_limit::{
     RateLimiter, UNKNOWN_CLIENT, rate_limit_key,
 };
 use crate::similarity::{MeaningJudge, PreparedWord};
+use crate::stats::StatsSummary;
 use crate::turnstile::{HumanCheck, START_GAME_ACTION, TurnstileVerifier};
 
 pub const ADMIN_TOKEN_HEADER: &str = "x-admin-token";
@@ -315,9 +316,16 @@ enum PlayerState {
 }
 
 #[derive(Serialize)]
+struct ResultResponse {
+    #[serde(flatten)]
+    result: FinishResponse,
+    stats: Option<StatsSummary>,
+}
+
+#[derive(Serialize)]
 struct PlayerTodayResponse {
     state: PlayerState,
-    result: Option<FinishResponse>,
+    result: Option<ResultResponse>,
 }
 
 #[derive(Deserialize)]
@@ -523,7 +531,10 @@ async fn get_player_today(
             },
             Some(PlayerDay::Finished { outcome }) => PlayerTodayResponse {
                 state: PlayerState::Finished,
-                result: Some(game_result(&live.word.puzzle, &outcome)),
+                result: Some(ResultResponse {
+                    result: game_result(&live.word.puzzle, &outcome),
+                    stats: Some(players.stats_for(&outcome)),
+                }),
             },
         };
     Ok(Json(response))
@@ -601,7 +612,7 @@ async fn finish_game(
     State(state): State<Arc<AppState>>,
     client: Client,
     Path(game_id): Path<String>,
-) -> Result<Json<FinishResponse>, ApiError> {
+) -> Result<Json<ResultResponse>, ApiError> {
     enforce_rate_limit(
         &state.result_limiter,
         &client.rate_limit_key,
@@ -613,8 +624,12 @@ async fn finish_game(
         return Err(ApiError::GameNotFound);
     };
     game.finish(now, false);
-    state.players.lock().unwrap().record_finish(game);
-    Ok(Json(game.result()))
+    let mut players = state.players.lock().unwrap();
+    players.record_finish(game);
+    Ok(Json(ResultResponse {
+        result: game.result(),
+        stats: players.stats_for_game(game),
+    }))
 }
 
 pub fn router(state: Arc<AppState>) -> Router {
