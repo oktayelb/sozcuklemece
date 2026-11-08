@@ -16,6 +16,16 @@
         <button id="play-button" class="button button-play" type="button" hidden>Oyna</button>
         <div id="human-check" class="human-check"></div>
       </div>
+      <details class="how-to">
+        <summary>Nasıl oynanır?</summary>
+        <ol class="how-to-steps">
+          <li>Ekrana daha önce hiç duyulmamış, uydurma bir sözcük gelir. Ne anlama geldiğini kendi cümlenle yaz.</li>
+          <li>Tanımı kelimesi kelimesine bilmen gerekmez. Yapay zekâ tahminini anlamca karşılaştırır ve ne kadar yaklaştığını yüzde olarak gösterir.</li>
+          <li>Üç dakikan var. 1000 puanla başlarsın, süre ilerledikçe puanın 500'e kadar düşer.</li>
+          <li>Takılırsan ipucu al: kök ve ekler, cümlede kullanımı, kategori. Her ipucu 150 puan götürür.</li>
+          <li>Sözcüğün kendisini kullanamazsın. Her sözcüğe tek hakkın var, sonunda bugün oynayan herkesle karşılaştırılırsın.</li>
+        </ol>
+      </details>
       <p id="played-note" class="played-note" hidden>Bugünün sözcüğünü oynadın. Yeni sözcük yarın.</p>
       <p id="error-banner" class="error-banner" role="alert" hidden></p>
       <p id="today-date" class="today-date"></p>
@@ -24,7 +34,10 @@
     <section id="game-screen" class="screen" hidden>
       <header class="game-header">
         <h2 id="game-word" class="headword game-word"></h2>
-        <span id="timer-text" class="timer" role="timer">3:00</span>
+        <div class="game-meters">
+          <span id="timer-text" class="timer" role="timer">3:00</span>
+          <span class="live-score"><span class="live-score-label">Puan</span> <span id="live-score">1000</span></span>
+        </div>
         <div class="time-bar"><div id="time-bar-fill" class="time-bar-fill"></div></div>
       </header>
 

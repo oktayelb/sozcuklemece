@@ -18,8 +18,8 @@ use crate::daily_word::{DailyWordStore, StoreError, game_day, moment_in_game_tim
 use crate::encoder::{EncoderError, TeiEncoder};
 use crate::game::{
     FinishResponse, GAME_SECONDS, GUESS_INTERVAL_SECONDS, Game, GuessCheck, GuessResponse,
-    HINT_KINDS, HINT_PENALTY, HintKind, HintResponse, JudgedGuess, MAX_GUESS_LENGTH, RevealedHint,
-    game_result, remove_stale_games,
+    HINT_KINDS, HINT_PENALTY, HintKind, HintResponse, JudgedGuess, MAX_GUESS_LENGTH,
+    MAX_TIME_PENALTY, RevealedHint, game_result, remove_stale_games,
 };
 use crate::players::{PlayerDay, TodaysPlayers, is_valid_player_id};
 use crate::puzzle::Puzzle;
@@ -294,6 +294,7 @@ struct StartResponse {
     hints: Vec<HintOption>,
     duration_seconds: i64,
     hint_penalty: i64,
+    max_time_penalty: i64,
     guess_interval_seconds: f64,
     remaining_seconds: f64,
     score: i64,
@@ -403,6 +404,7 @@ fn start_response(game: &Game, now: f64) -> StartResponse {
         hints,
         duration_seconds: GAME_SECONDS as i64,
         hint_penalty: HINT_PENALTY,
+        max_time_penalty: MAX_TIME_PENALTY as i64,
         guess_interval_seconds: GUESS_INTERVAL_SECONDS,
         remaining_seconds: game.remaining_seconds(now),
         score: game.current_score(now),

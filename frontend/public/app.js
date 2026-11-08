@@ -8,6 +8,9 @@ const game = {
   id: null,
   durationSeconds: 0,
   hintPenalty: 0,
+  maxTimePenalty: 0,
+  scoreAtSync: 0,
+  remainingAtSync: 0,
   guessIntervalSeconds: 0,
   nextGuessAt: 0,
   deadline: 0,
@@ -236,12 +239,21 @@ function secondsRemaining() {
 
 function syncWithServer(response) {
   game.deadline = performance.now() + response.remaining_seconds * 1000;
+  game.scoreAtSync = response.score;
+  game.remainingAtSync = response.remaining_seconds;
+}
+
+function liveScore() {
+  const secondsSinceSync = game.remainingAtSync - secondsRemaining();
+  const timePenalty = (game.maxTimePenalty * secondsSinceSync) / game.durationSeconds;
+  return Math.round(game.scoreAtSync - timePenalty);
 }
 
 function renderClock() {
   const remaining = secondsRemaining();
 
   element("timer-text").textContent = formatClock(remaining);
+  element("live-score").textContent = liveScore();
   element("time-bar-fill").style.width = `${(remaining / game.durationSeconds) * 100}%`;
   element("game-screen").classList.toggle("low-time", remaining <= LOW_TIME_SECONDS);
 }
@@ -395,6 +407,7 @@ async function startGame() {
     game.id = started.game_id;
     game.durationSeconds = started.duration_seconds;
     game.hintPenalty = started.hint_penalty;
+    game.maxTimePenalty = started.max_time_penalty;
     game.guessIntervalSeconds = started.guess_interval_seconds;
     game.nextGuessAt = 0;
     game.isEnding = false;

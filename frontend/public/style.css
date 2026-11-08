@@ -176,6 +176,35 @@ p {
   margin-top: 1rem;
 }
 
+.how-to {
+  max-width: 34rem;
+  margin-top: 1.6rem;
+  color: var(--ink-soft);
+  text-align: left;
+}
+
+.how-to summary {
+  color: var(--ink);
+  font-style: italic;
+  text-align: center;
+  cursor: pointer;
+}
+
+.how-to summary:focus-visible {
+  outline: 2px solid var(--pen-blue);
+  outline-offset: 3px;
+}
+
+.how-to-steps {
+  margin: 0.8rem 0 0;
+  padding-left: 1.4rem;
+  line-height: 1.45;
+}
+
+.how-to-steps li + li {
+  margin-top: 0.35rem;
+}
+
 .played-note {
   margin-top: 1rem;
   color: var(--ink-soft);
@@ -238,9 +267,31 @@ p {
   animation: word-appears 0.4s ease-out;
 }
 
+.game-meters {
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+  gap: 1.6rem;
+  margin-top: 0.7rem;
+}
+
+.live-score {
+  font-size: 1.6rem;
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.live-score-label {
+  color: var(--ink-soft);
+  font-size: 0.74rem;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .timer {
   display: block;
-  margin-top: 0.7rem;
   font-size: 1.6rem;
   font-weight: 600;
   line-height: 1;
@@ -558,7 +609,6 @@ p {
 
 .crowd-bar-fill {
   display: block;
-  min-width: 2px;
   height: 100%;
   background: repeating-linear-gradient(115deg, var(--ink-soft) 0 2px, transparent 2px 4px);
 }

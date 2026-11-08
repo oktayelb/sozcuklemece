@@ -67,6 +67,7 @@ async fn start_gives_word_and_hint_names_without_hint_contents() {
     assert_eq!(kinds, vec!["parts", "sentence", "category"]);
     assert_eq!(body["duration_seconds"], GAME_SECONDS as i64);
     assert_eq!(body["score"], 1000);
+    assert_eq!(body["max_time_penalty"], 500);
 }
 
 #[tokio::test]
