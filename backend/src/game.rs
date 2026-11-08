@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::puzzle::Puzzle;
-use crate::similarity::{PreparedWord, WIN_SIMILARITY, closeness_percent};
+use crate::similarity::{Judgement, PreparedWord, WrongTurn, closeness_percent};
 use crate::text::{compact_text, normalize_text};
 
 pub const GAME_SECONDS: f64 = 180.0;
@@ -52,6 +52,13 @@ pub fn closeness_label(closeness: i64) -> &'static str {
         return "Isınıyor";
     }
     "Uzak"
+}
+
+pub fn wrong_turn_note(wrong_turn: WrongTurn) -> &'static str {
+    match wrong_turn {
+        WrongTurn::Opposite => "Tersini söylüyor gibisin.",
+        WrongTurn::OtherMeaning => "Konu yakın, anlam başka.",
+    }
 }
 
 pub fn repeats_the_word(guess: &str, puzzle: &Puzzle) -> bool {
@@ -125,6 +132,7 @@ pub struct JudgedGuess {
     pub text: String,
     pub closeness: i64,
     pub label: &'static str,
+    pub note: Option<&'static str>,
 }
 
 #[derive(Debug, PartialEq, Serialize)]
@@ -140,6 +148,7 @@ pub struct HintResponse {
 pub struct GuessResponse {
     pub closeness: Option<i64>,
     pub message: String,
+    pub note: Option<&'static str>,
     pub rejected: bool,
     pub won: bool,
     pub finished: bool,
@@ -307,6 +316,7 @@ impl Game {
         GuessResponse {
             closeness,
             message: message.to_string(),
+            note: None,
             rejected,
             won: self.won,
             finished: self.finished,
@@ -348,18 +358,27 @@ impl Game {
         GuessCheck::NeedsJudging(self.word.clone())
     }
 
-    pub fn record_judged_guess(&mut self, text: &str, similarity: f64, now: f64) -> GuessResponse {
+    pub fn record_judged_guess(
+        &mut self,
+        text: &str,
+        judgement: &Judgement,
+        now: f64,
+    ) -> GuessResponse {
         self.finish_if_time_is_up(now);
         if self.finished {
             return self.guess_response(now, "Oyun bitti.", None, false);
         }
 
         let closeness;
-        if similarity >= WIN_SIMILARITY {
+        let mut note = None;
+        if judgement.won {
             closeness = WIN_CLOSENESS;
             self.finish(now, true);
         } else {
-            closeness = closeness_percent(similarity);
+            closeness = closeness_percent(judgement.similarity);
+            if let Some(wrong_turn) = judgement.wrong_turn {
+                note = Some(wrong_turn_note(wrong_turn));
+            }
         }
         let label = closeness_label(closeness);
         self.guess_count += 1;
@@ -368,8 +387,11 @@ impl Game {
             text: text.to_string(),
             closeness,
             label,
+            note,
         });
-        self.guess_response(now, label, Some(closeness), false)
+        let mut response = self.guess_response(now, label, Some(closeness), false);
+        response.note = note;
+        response
     }
 
     pub fn outcome(&self) -> Outcome {
@@ -391,6 +413,7 @@ impl Game {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::similarity::WIN_SIMILARITY;
 
     const START: f64 = 1000.0;
 
@@ -403,6 +426,7 @@ mod tests {
             category: "nesne".to_string(),
             field: "yemek".to_string(),
             also_accepted: vec![],
+            opposite_meanings: vec![],
             wrong_meanings: vec![],
             inflected_stems: vec![],
         }
@@ -422,7 +446,7 @@ mod tests {
 
     fn game_started_at(started_at: f64) -> Game {
         Game::new(
-            Arc::new(PreparedWord::new(puzzle(), vec![], vec![])),
+            Arc::new(PreparedWord::new(puzzle(), vec![], vec![], vec![])),
             "oyuncu".to_string(),
             started_at,
         )
@@ -432,11 +456,21 @@ mod tests {
         game_started_at(START)
     }
 
+    fn judgement_of(similarity: f64) -> Judgement {
+        Judgement {
+            similarity,
+            won: similarity >= WIN_SIMILARITY,
+            wrong_turn: None,
+        }
+    }
+
     fn submit(game: &mut Game, text: &str, similarity: f64, now: f64) -> GuessResponse {
         match game.check_guess(text, now) {
             GuessCheck::TooSoon { .. } => panic!("tahmin aralığı beklenmedi"),
             GuessCheck::Answered(response) => response,
-            GuessCheck::NeedsJudging(_) => game.record_judged_guess(text, similarity, now),
+            GuessCheck::NeedsJudging(_) => {
+                game.record_judged_guess(text, &judgement_of(similarity), now)
+            }
         }
     }
 
@@ -535,7 +569,7 @@ mod tests {
         };
         game.finish(START + 1.0, false);
 
-        let response = game.record_judged_guess("sosu silen ekmek", 0.99, START);
+        let response = game.record_judged_guess("sosu silen ekmek", &judgement_of(0.99), START);
 
         assert!(!response.won);
         assert_eq!(game.result().guess_count, 0);

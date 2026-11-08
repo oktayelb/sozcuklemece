@@ -38,7 +38,9 @@ async fn every_definition_wins_its_own_puzzle() {
 async fn every_wrong_meaning_loses_its_own_puzzle() {
     let (judge, words) = prepared_words().await;
     for word in words.values() {
-        for wrong_meaning in &word.puzzle.wrong_meanings {
+        let mut wrong_meanings = word.puzzle.wrong_meanings.clone();
+        wrong_meanings.extend(word.puzzle.opposite_meanings.iter().cloned());
+        for wrong_meaning in &wrong_meanings {
             let similarity = judge.similarity(word, wrong_meaning).await.unwrap();
             assert!(similarity < WIN_SIMILARITY, "{wrong_meaning}");
         }

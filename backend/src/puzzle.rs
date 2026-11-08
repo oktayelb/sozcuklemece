@@ -14,6 +14,8 @@ pub struct Puzzle {
     #[serde(default)]
     pub also_accepted: Vec<String>,
     #[serde(default)]
+    pub opposite_meanings: Vec<String>,
+    #[serde(default)]
     pub wrong_meanings: Vec<String>,
     #[serde(default)]
     pub inflected_stems: Vec<String>,
@@ -61,6 +63,11 @@ impl Puzzle {
                 &self.also_accepted,
                 MAX_LONG_TEXT_LENGTH,
             )?,
+            opposite_meanings: cleaned_list(
+                "opposite_meanings",
+                &self.opposite_meanings,
+                MAX_LONG_TEXT_LENGTH,
+            )?,
             wrong_meanings: cleaned_list(
                 "wrong_meanings",
                 &self.wrong_meanings,
@@ -88,6 +95,7 @@ mod tests {
             category: "nesne".to_string(),
             field: "yemek".to_string(),
             also_accepted: vec![],
+            opposite_meanings: vec![],
             wrong_meanings: vec![],
             inflected_stems: vec![],
         }

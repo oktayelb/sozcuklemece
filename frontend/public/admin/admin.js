@@ -1,5 +1,5 @@
 const TEXT_FIELDS = ["word", "definition", "parts", "sentence", "category", "field"];
-const LIST_FIELDS = ["also_accepted", "wrong_meanings", "inflected_stems"];
+const LIST_FIELDS = ["also_accepted", "opposite_meanings", "wrong_meanings", "inflected_stems"];
 
 function element(id) {
   return document.getElementById(id);

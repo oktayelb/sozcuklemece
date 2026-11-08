@@ -67,6 +67,7 @@ nginx ön yüz dosyalarını önbellek başlıklarıyla sunar: HTML, JS ve CSS 5
 `/admin/` sayfasını aç, `ADMIN_TOKEN` parolasını gir, formu doldurup yayınla. `ADMIN_TOKEN` ayarlı değilse yükleme kapalıdır. Parola düz metin gittiği için canlıda HTTPS kullan.
 
 - Sözcüğün işlenmiş hali yüklenirken hazırlanır ve bellekte durur, tahminlerde yeniden hesaplanmaz.
+- Zıt anlamlar ve yanlış anlamlar ayrı listelerdir. İkisi de kazanmayı zorlaştırır. Tahmin bunlardan birine doğru anlamlardan daha yakınsa oyuncu "Tersini söylüyor gibisin" ya da "Konu yakın, anlam başka" notunu görür.
 - Yeni sözcük hemen oyuna girer, önceki sözcük bellekten ve diskten silinir. O sırada süren oyunlar kendi sözcükleriyle biter.
 - Sözcük yüklendikten 24 saat sonra kendiliğinden silinir. Yenisi yüklenene kadar oyun başlatılamaz.
 - Sunucu yeniden başlarsa sözcük `WORD_FILE` dosyasından okunup yeniden hazırlanır. Bu dosya depoya girmez.

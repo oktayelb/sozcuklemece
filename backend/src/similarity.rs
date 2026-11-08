@@ -10,6 +10,7 @@ pub const WIN_SIMILARITY: f64 = 0.615;
 pub const ZERO_CLOSENESS_SIMILARITY: f64 = 0.15;
 pub const HIGHEST_CLOSENESS_WITHOUT_WIN: i64 = 99;
 pub const GUESS_CACHE_SIZE: u64 = 1000;
+pub const WRONG_TURN_FLOOR: f64 = 0.4;
 
 pub fn closeness_percent(similarity: f64) -> i64 {
     let similarity_range = WIN_SIMILARITY - ZERO_CLOSENESS_SIMILARITY;
@@ -18,33 +19,75 @@ pub fn closeness_percent(similarity: f64) -> i64 {
     percent.clamp(0, HIGHEST_CLOSENESS_WITHOUT_WIN)
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WrongTurn {
+    Opposite,
+    OtherMeaning,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Judgement {
+    pub similarity: f64,
+    pub won: bool,
+    pub wrong_turn: Option<WrongTurn>,
+}
+
+fn wrong_turn_of(
+    closest_right: f64,
+    closest_opposite: f64,
+    closest_other_meaning: f64,
+) -> Option<WrongTurn> {
+    let opposite_leads = closest_opposite > closest_right
+        && closest_opposite >= closest_other_meaning
+        && closest_opposite >= WRONG_TURN_FLOOR;
+    if opposite_leads {
+        return Some(WrongTurn::Opposite);
+    }
+    let other_meaning_leads =
+        closest_other_meaning > closest_right && closest_other_meaning >= WRONG_TURN_FLOOR;
+    if other_meaning_leads {
+        return Some(WrongTurn::OtherMeaning);
+    }
+    None
+}
+
 pub struct PreparedWord {
     pub puzzle: Puzzle,
     right_vectors: Vec<Vec<f32>>,
-    wrong_vectors: Vec<Vec<f32>>,
+    opposite_vectors: Vec<Vec<f32>>,
+    other_meaning_vectors: Vec<Vec<f32>>,
 }
 
 impl PreparedWord {
     pub fn new(
         puzzle: Puzzle,
         right_vectors: Vec<Vec<f32>>,
-        wrong_vectors: Vec<Vec<f32>>,
+        opposite_vectors: Vec<Vec<f32>>,
+        other_meaning_vectors: Vec<Vec<f32>>,
     ) -> PreparedWord {
         PreparedWord {
             puzzle,
             right_vectors,
-            wrong_vectors,
+            opposite_vectors,
+            other_meaning_vectors,
         }
     }
 
-    pub fn similarity_to(&self, guess_vector: &[f32]) -> f64 {
+    pub fn compare(&self, guess_vector: &[f32]) -> Judgement {
         let closest_right = closest_similarity(&self.right_vectors, guess_vector);
-        if self.wrong_vectors.is_empty() {
-            return closest_right;
+        let closest_opposite = closest_similarity(&self.opposite_vectors, guess_vector);
+        let closest_other_meaning = closest_similarity(&self.other_meaning_vectors, guess_vector);
+
+        let closest_wrong = closest_opposite.max(closest_other_meaning);
+        let mut similarity = closest_right;
+        if closest_wrong > closest_right {
+            similarity = closest_right - (closest_wrong - closest_right);
         }
-        let closest_wrong = closest_similarity(&self.wrong_vectors, guess_vector);
-        let wrong_side_excess = (closest_wrong - closest_right).max(0.0);
-        closest_right - wrong_side_excess
+        Judgement {
+            similarity,
+            won: similarity >= WIN_SIMILARITY,
+            wrong_turn: wrong_turn_of(closest_right, closest_opposite, closest_other_meaning),
+        }
     }
 }
 
@@ -114,16 +157,27 @@ impl MeaningJudge {
         right_texts.extend(puzzle.also_accepted.iter().cloned());
         let right_vectors = self.encode_all(&right_texts).await?;
 
-        let mut wrong_vectors = Vec::new();
-        if !puzzle.wrong_meanings.is_empty() {
-            wrong_vectors = self.encode_all(&puzzle.wrong_meanings).await?;
-        }
-        Ok(PreparedWord::new(puzzle, right_vectors, wrong_vectors))
+        let opposite_vectors = self.encode_all(&puzzle.opposite_meanings).await?;
+        let other_meaning_vectors = self.encode_all(&puzzle.wrong_meanings).await?;
+        Ok(PreparedWord::new(
+            puzzle,
+            right_vectors,
+            opposite_vectors,
+            other_meaning_vectors,
+        ))
+    }
+
+    pub async fn evaluate(
+        &self,
+        word: &PreparedWord,
+        guess: &str,
+    ) -> Result<Judgement, EncoderError> {
+        let guess_vector = self.encode_guess(normalize_text(guess)).await?;
+        Ok(word.compare(&guess_vector))
     }
 
     pub async fn similarity(&self, word: &PreparedWord, guess: &str) -> Result<f64, EncoderError> {
-        let guess_vector = self.encode_guess(normalize_text(guess)).await?;
-        Ok(word.similarity_to(&guess_vector))
+        Ok(self.evaluate(word, guess).await?.similarity)
     }
 }
 
@@ -140,6 +194,7 @@ mod tests {
             category: "nesne".to_string(),
             field: "yemek".to_string(),
             also_accepted: vec![],
+            opposite_meanings: vec![],
             wrong_meanings: vec![],
             inflected_stems: vec![],
         }
@@ -157,14 +212,58 @@ mod tests {
 
     #[test]
     fn closest_right_meaning_counts() {
-        let word = PreparedWord::new(puzzle(), vec![vec![1.0, 0.0], vec![0.0, 1.0]], vec![]);
-        assert_eq!(word.similarity_to(&[0.0, 1.0]), 1.0);
+        let word = PreparedWord::new(
+            puzzle(),
+            vec![vec![1.0, 0.0, 0.0], vec![0.0, 1.0, 0.0]],
+            vec![],
+            vec![],
+        );
+        assert_eq!(word.compare(&[0.0, 1.0, 0.0]).similarity, 1.0);
     }
 
     #[test]
     fn being_closer_to_a_wrong_meaning_lowers_the_similarity() {
-        let word = PreparedWord::new(puzzle(), vec![vec![1.0, 0.0]], vec![vec![0.6, 0.8]]);
-        let similarity = word.similarity_to(&[0.6, 0.8]);
-        assert!((similarity - 0.2).abs() < 1e-6);
+        let word = PreparedWord::new(puzzle(), vec![vec![1.0, 0.0]], vec![], vec![vec![0.6, 0.8]]);
+        let judgement = word.compare(&[0.6, 0.8]);
+        assert!((judgement.similarity - 0.2).abs() < 1e-6);
+        assert!(!judgement.won);
+    }
+
+    #[test]
+    fn closest_opposite_is_named() {
+        let word = PreparedWord::new(
+            puzzle(),
+            vec![vec![1.0, 0.0, 0.0]],
+            vec![vec![0.0, 1.0, 0.0]],
+            vec![vec![0.0, 0.0, 1.0]],
+        );
+        let judgement = word.compare(&[0.0, 0.9, 0.3]);
+        assert_eq!(judgement.wrong_turn, Some(WrongTurn::Opposite));
+    }
+
+    #[test]
+    fn closest_other_meaning_is_named() {
+        let word = PreparedWord::new(
+            puzzle(),
+            vec![vec![1.0, 0.0, 0.0]],
+            vec![vec![0.0, 1.0, 0.0]],
+            vec![vec![0.0, 0.0, 1.0]],
+        );
+        let judgement = word.compare(&[0.0, 0.3, 0.9]);
+        assert_eq!(judgement.wrong_turn, Some(WrongTurn::OtherMeaning));
+    }
+
+    #[test]
+    fn faint_resemblance_to_a_wrong_meaning_is_not_named() {
+        let word = PreparedWord::new(puzzle(), vec![vec![1.0, 0.0]], vec![vec![0.0, 1.0]], vec![]);
+        let judgement = word.compare(&[0.1, 0.3]);
+        assert_eq!(judgement.wrong_turn, None);
+    }
+
+    #[test]
+    fn guess_closer_to_the_right_meaning_has_no_wrong_turn() {
+        let word = PreparedWord::new(puzzle(), vec![vec![1.0, 0.0]], vec![vec![0.0, 1.0]], vec![]);
+        let judgement = word.compare(&[0.8, 0.6]);
+        assert_eq!(judgement.wrong_turn, None);
     }
 }

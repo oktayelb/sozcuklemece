@@ -476,6 +476,13 @@ p {
   white-space: nowrap;
 }
 
+.guess-note {
+  grid-column: 1 / -1;
+  color: var(--pencil-red);
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
 .stamp {
   float: right;
   margin: 0.2rem 0 0.8rem 1rem;

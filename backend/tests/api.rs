@@ -165,6 +165,34 @@ async fn matching_a_wrong_meaning_does_not_win() {
         .await
         .body;
     assert_eq!(body["won"], false);
+    assert_eq!(body["note"], "Konu yakın, anlam başka.");
+}
+
+#[tokio::test]
+async fn matching_an_opposite_meaning_says_so() {
+    let server = TestServer::with_word().await;
+    let player_id = new_player_id();
+    let game_id = start_as(&server, &player_id).await["game_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let body = server
+        .guess(&game_id, &first_puzzle().opposite_meanings[0])
+        .await
+        .body;
+    assert_eq!(body["won"], false);
+    assert_eq!(body["note"], "Tersini söylüyor gibisin.");
+
+    let resumed = start_as(&server, &player_id).await;
+    assert_eq!(resumed["guesses"][0]["note"], "Tersini söylüyor gibisin.");
+}
+
+#[tokio::test]
+async fn unrelated_guess_has_no_note() {
+    let server = TestServer::with_word().await;
+    let game_id = server.start_game_id().await;
+    let body = server.guess(&game_id, UNKNOWN_GUESS).await.body;
+    assert_eq!(body["note"], Value::Null);
 }
 
 #[tokio::test]

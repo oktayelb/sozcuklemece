@@ -128,10 +128,11 @@ mod tests {
             category: "nesne".to_string(),
             field: "yemek".to_string(),
             also_accepted: vec![],
+            opposite_meanings: vec![],
             wrong_meanings: vec![],
             inflected_stems: vec![],
         };
-        Arc::new(PreparedWord::new(puzzle, vec![], vec![]))
+        Arc::new(PreparedWord::new(puzzle, vec![], vec![], vec![]))
     }
 
     fn started_game(players: &mut TodaysPlayers, word: &Arc<PreparedWord>) -> Game {

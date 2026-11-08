@@ -608,13 +608,13 @@ async fn submit_guess(
         }
     };
 
-    let similarity = state.judge.similarity(&word_to_judge, &body.text).await?;
+    let judgement = state.judge.evaluate(&word_to_judge, &body.text).await?;
 
     let mut games = state.games.lock().unwrap();
     let Some(game) = games.get_mut(&game_id) else {
         return Err(ApiError::GameNotFound);
     };
-    let response = game.record_judged_guess(&body.text, similarity, now);
+    let response = game.record_judged_guess(&body.text, &judgement, now);
     state.players.lock().unwrap().record_finish(game);
     Ok(Json(response))
 }

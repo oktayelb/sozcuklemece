@@ -342,7 +342,14 @@ async function openHint(hint, slot) {
   }
 }
 
-function addGuessToList(text, closeness, label) {
+function feedbackText(message, note) {
+  if (note) {
+    return `${message}. ${note}`;
+  }
+  return message;
+}
+
+function addGuessToList(text, closeness, label, note) {
   const item = document.createElement("li");
   item.className = "guess-item";
 
@@ -362,6 +369,12 @@ function addGuessToList(text, closeness, label) {
   verdict.textContent = `${label} · %${closeness}`;
 
   item.append(guessText, meter, verdict);
+  if (note) {
+    const noteLine = document.createElement("span");
+    noteLine.className = "guess-note";
+    noteLine.textContent = note;
+    item.append(noteLine);
+  }
   element("guess-list").prepend(item);
 }
 
@@ -386,9 +399,9 @@ async function submitGuess(event) {
     }
     syncWithServer(response);
     renderClock();
-    element("guess-feedback").textContent = response.message;
+    element("guess-feedback").textContent = feedbackText(response.message, response.note);
     if (!response.rejected) {
-      addGuessToList(text, response.closeness, response.message);
+      addGuessToList(text, response.closeness, response.message, response.note);
       input.value = "";
     }
   } catch (error) {
@@ -425,7 +438,7 @@ async function startGame() {
     element("game-word").textContent = started.word;
     element("guess-list").replaceChildren();
     for (const guess of started.guesses) {
-      addGuessToList(guess.text, guess.closeness, guess.label);
+      addGuessToList(guess.text, guess.closeness, guess.label, guess.note);
     }
     element("guess-feedback").textContent = "";
     element("guess-input").value = "";

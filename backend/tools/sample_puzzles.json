@@ -11,10 +11,12 @@
       "Mutlu bir anın sona ereceğini düşünüp hüzünlenmek",
       "Henüz yaşarken bir anı özlemeye başlamak"
     ],
+    "opposite_meanings": [
+      "Hiçbir şeyi özlememe hali"
+    ],
     "wrong_meanings": [
       "Geçmişte kalmış güzel günleri özleme hissi",
       "Gelecekte olacak bir şeyi sabırsızlıkla bekleme hissi",
-      "Hiçbir şeyi özlememe hali",
       "Birini ya da bir şeyi özlemek",
       "Bir şeyin biteceğini bilmek"
     ]
@@ -31,6 +33,7 @@
       "Yemeğin sosuna banılan ekmek",
       "Tabağı temizlemek için kullanılan ekmek"
     ],
+    "opposite_meanings": [],
     "wrong_meanings": [
       "Tencerenin dibini kazımak için kullanılan mutfak aleti",
       "Bulaşık yıkarken kullanılan sünger",
@@ -52,9 +55,11 @@
       "Soruları lafı dolandırarak savuşturan kişi",
       "Zor sorulardan sıyrılmayı bilen politikacı"
     ],
+    "opposite_meanings": [
+      "Sorulan her soruyu açıkça yanıtlayan siyasetçi"
+    ],
     "wrong_meanings": [
       "Her şeyi sorgulayan meraklı kişi",
-      "Sorulan her soruyu açıkça yanıtlayan siyasetçi",
       "Sınav sorularını hazırlayan kişi",
       "Haber yazan gazeteci",
       "Soru sormayı sevmeyen kişi"
@@ -72,6 +77,7 @@
       "Bitkilerin mantarlar sayesinde yer altında haberleştiği sistem",
       "Köklerin toprak altında oluşturduğu ağ"
     ],
+    "opposite_meanings": [],
     "wrong_meanings": [
       "Toprak altında yetişen kök sebzeler",
       "Bilgisayarların birbirine bağlandığı internet ağı",
@@ -92,10 +98,12 @@
       "O an söyleyemeyip sonradan akla gelen söz",
       "Geç akla gelen karşılık"
     ],
+    "opposite_meanings": [
+      "Tartışma sırasında anında verilen mükemmel cevap"
+    ],
     "wrong_meanings": [
       "Duş alırken şarkı söyleme alışkanlığı",
       "Mesajlara çok hızlı cevap verme",
-      "Tartışma sırasında anında verilen mükemmel cevap",
       "Duşta düşünüp bulunan yeni fikirler",
       "Duş alırken gelen telefona cevap vermek"
     ]
@@ -112,6 +120,7 @@
       "Arkadaşların hesabı ödemek için birbiriyle yarışması",
       "Hesabı ben ödeyeceğim diye kavga etmek"
     ],
+    "opposite_meanings": [],
     "wrong_meanings": [
       "Hesabı arkadaşlar arasında eşit olarak bölüşme",
       "Hesabı ödemeden restorandan kaçma",
@@ -133,10 +142,12 @@
       "Seçim yaklaşınca halkı hatırlayan politikacı",
       "Seçimden seçime ortaya çıkan vekil"
     ],
+    "opposite_meanings": [
+      "Seçim olmasa da her zaman halkın arasında olan siyasetçi"
+    ],
     "wrong_meanings": [
       "Her seçimde oy kullanmayı seven vatandaş",
       "Eski sandıkları toplayan kişi",
-      "Seçim olmasa da her zaman halkın arasında olan siyasetçi",
       "Seçimi kazanmak isteyen aday",
       "Çeyiz sandığı"
     ]
@@ -154,10 +165,12 @@
       "Bir topluluğun tek bir akıl gibi hareket etmesi",
       "Karınca ya da arı gibi canlıların ortak zekası"
     ],
+    "opposite_meanings": [
+      "Tek başına çok zeki olan kişi"
+    ],
     "wrong_meanings": [
       "Başkalarına uyarak düşünmeden hareket etme",
       "Hayvan sürülerini otlatan çoban",
-      "Tek başına çok zeki olan kişi",
       "Hayvan sürüsü",
       "Araç sürmek",
       "Zeki hayvan türleri"
@@ -176,10 +189,12 @@
       "Ekranda durmadan gezinerek zaman harcamak",
       "Sosyal medyada kısa videolara dalıp saatler harcamak"
     ],
+    "opposite_meanings": [
+      "Telefonu yalnızca gerektiğinde kullanma alışkanlığı"
+    ],
     "wrong_meanings": [
       "Karda ya da buzda kayarak oynanan çocuk oyunu",
       "Parkta kaydıraktan kayma",
-      "Telefonu yalnızca gerektiğinde kullanma alışkanlığı",
       "Telefonla konuşmak",
       "Bir nesneyi itip başka yere taşımak"
     ]
@@ -196,10 +211,12 @@
       "Odaya girip neden geldiğini hatırlayamamak",
       "Kapıdan geçince aklındakini unutmak"
     ],
+    "opposite_meanings": [
+      "Neden geldiğini her zaman hatırlama"
+    ],
     "wrong_meanings": [
       "Eşyalarını evde unutma",
       "Tanıdığı birinin adını hatırlayamama",
-      "Neden geldiğini her zaman hatırlama",
       "Genel olarak unutkan olmak",
       "Kapı eşiğinde durmak"
     ]
@@ -216,6 +233,7 @@
       "Aynı kuyrukta beklediğin yabancı",
       "Kuyrukta sohbet ettiğin kişi"
     ],
+    "opposite_meanings": [],
     "wrong_meanings": [
       "Sırada beklemeden öne geçen kişi",
       "Hayvanların kuyruğunda bulunan kemik",
@@ -236,13 +254,15 @@
       "Telefon, anahtar ve cüzdanın yanında olup olmadığına bakmak",
       "Dışarı çıkmadan eşyalarının tam olduğundan emin olmak"
     ],
+    "opposite_meanings": [
+      "Hiçbir şeyi kontrol etmeden evden çıkmak"
+    ],
     "wrong_meanings": [
       "Cepteki parayı sayma",
       "Öğretmenin sınıfta yoklama alması",
       "Cep telefonunun faturasını ödeme",
       "Kaybolan anahtarı aramak",
-      "Cepleri boşaltmak",
-      "Hiçbir şeyi kontrol etmeden evden çıkmak"
+      "Cepleri boşaltmak"
     ]
   },
   {
@@ -257,14 +277,16 @@
       "Bir yere alışıp orayı yuvası gibi görmek",
       "Yeni bir mekanı ev gibi sahiplenmek"
     ],
+    "opposite_meanings": [
+      "Bir yere hiçbir zaman alışamamak",
+      "Yeni gidilen bir yerde yabancı hissetmek",
+      "Hiçbir yeri ev gibi hissedememek"
+    ],
     "wrong_meanings": [
       "Evini temizleyip düzenlemek",
       "Evden uzaktayken evini özlemek",
-      "Bir yere hiçbir zaman alışamamak",
       "Yeni bir ev satın almak",
-      "Yeni gidilen bir yerde yabancı hissetmek",
-      "Evi sevmek",
-      "Hiçbir yeri ev gibi hissedememek"
+      "Evi sevmek"
     ],
     "inflected_stems": [
       "evimse"
@@ -282,10 +304,12 @@
       "Asıl işten kaçmak için oyalanılan küçük meşgale",
       "Çalışmamak için bulunan önemsiz uğraş"
     ],
+    "opposite_meanings": [
+      "İşleri ertelemeden hemen bitirme"
+    ],
     "wrong_meanings": [
       "Çocukları oyalamak için verilen oyuncak",
       "Boş zamanlarda keyifle yapılan hobi",
-      "İşleri ertelemeden hemen bitirme",
       "Tembellik etmek",
       "Boş boş vakit geçirmek"
     ],
