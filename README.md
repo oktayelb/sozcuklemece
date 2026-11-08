@@ -9,7 +9,7 @@ oyun şöyle olacak. 3 dakikalık bir sayaç ve bu sürede bulmaya çalışan bi
     kelimenin kökündeki sözcük(ler), ek(ler) 
     cümlede kullanımı
     Kategori ve ilgili olduğu alan (bilim, yemek,siyaset, his)
-her gün 1 ya da  yeni sözcükle yarışma oluyor.
+her gün 1 yeni sözcükle yarışma oluyor.
 
 
 Buradaki asıl olay şu, Sözcüğün tanımı 1 tane, ama kullanıcıların yazabilecekleri tanımlar sonsuz tane olduğu için iki cümleyi kıyaslayabilecek bir yönteme ihtiyacımız var.
@@ -20,27 +20,27 @@ Burada aynı zamanda çokça kullanıcının siteye gireceği kalabalık zamanla
 ## Çalıştırma
 
     uv sync
-    uv run uvicorn backend.main:app --port 8000
+    ADMIN_TOKEN=uzun-rastgele-bir-parola uv run uvicorn backend.main:app --port 8000
 
 Ardından http://127.0.0.1:8000 adresini aç. İlk açılışta model (yaklaşık 450 MB) indirilir.
 
 Testler: `uv run pytest`
 
-## Yeni sözcük ekleme
+## Günün sözcüğünü yükleme
 
-`backend/puzzles.json` dosyasına ekle:
+http://127.0.0.1:8000/admin/ adresini aç, `ADMIN_TOKEN` parolasını gir, formu doldurup yayınla. `ADMIN_TOKEN` ayarlı değilse yükleme kapalıdır. Parola düz metin gittiği için canlıda HTTPS kullan.
 
-- `definition`: oyun sonunda gösterilen tanım
-- `also_accepted`: oyuncuların yazabileceği kısa doğru anlatımlar
-- `wrong_meanings`: akla gelen yanlış anlamlar, tanımın zıttı ve fazla genel anlatımlar
-- `inflected_stems` (isteğe bağlı): sözcüğün çekimli kökü, ör. `evimse`, `oyalanc`
+- Sözcüğün işlenmiş hali yüklenirken hazırlanır ve bellekte durur, tahminlerde yeniden hesaplanmaz.
+- Yeni sözcük hemen oyuna girer, önceki sözcük bellekten ve diskten silinir. O sırada süren oyunlar kendi sözcükleriyle biter.
+- Sözcük yüklendikten 24 saat sonra kendiliğinden silinir. Yenisi yüklenene kadar oyun başlatılamaz.
+- Sunucu yeniden başlarsa sözcük `data/current_word.json` dosyasından okunup yeniden hazırlanır. Bu dosya depoya girmez.
 
-Sonra doğrulukla ilgili hatalı kararları gör: `uv run python -m tools.evaluate_guesses`
+Doğruluğu örnek sözcüklerle ölçmek için: `uv run python -m tools.evaluate_guesses`
 
-Oyun ayarları: kazanma eşiği `backend/similarity.py`, süre ve puan `backend/game.py`, günlük sözcük sayısı `backend/puzzles.py`, istek sınırları `backend/rate_limit.py`.
+Oyun ayarları: kazanma eşiği `backend/similarity.py`, süre ve puan `backend/game.py`, sözcüğün ömrü `backend/daily_word.py`, istek sınırları `backend/rate_limit.py`.
 
 ## İstek sınırı
 
-Oyun başlatma ve tahmin istekleri IP başına sınırlı. Sınır aşılınca sunucu 429 ve `Retry-After` döner. Sayaçlar oyunlar gibi süreç belleğinde tutuluyor, bu yüzden tek süreçle çalışır.
+Oyun başlatma, tahmin ve yönetim istekleri IP başına sınırlı. Sınır aşılınca sunucu 429 ve `Retry-After` döner. Sayaçlar oyunlar gibi süreç belleğinde tutuluyor, bu yüzden tek süreçle çalışır.
 
 Ters vekil (nginx vb.) başka bir makinedeyse uvicorn'a `--forwarded-allow-ips <vekil-ip>` ver, yoksa bütün oyuncular tek IP sayılır.

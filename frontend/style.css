@@ -165,11 +165,7 @@ p {
   color: var(--pencil-red);
 }
 
-.play-buttons {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 1.1rem;
+.play-area {
   min-height: 3.8rem;
   margin-top: 3rem;
 }
@@ -221,9 +217,19 @@ p {
   outline-offset: 3px;
 }
 
+.game-header {
+  text-align: center;
+}
+
+.game-word {
+  font-size: clamp(2.3rem, 11vw, 5rem);
+  animation: word-appears 0.4s ease-out;
+}
+
 .timer {
   display: block;
-  font-size: 2.3rem;
+  margin-top: 0.7rem;
+  font-size: 1.6rem;
   font-weight: 600;
   line-height: 1;
   font-variant-numeric: tabular-nums lining-nums;
@@ -232,7 +238,7 @@ p {
 
 .time-bar {
   height: 3px;
-  margin-top: 0.55rem;
+  margin-top: 0.45rem;
   background: var(--rule);
 }
 
@@ -250,10 +256,6 @@ p {
   background: var(--pencil-red);
 }
 
-.entry {
-  margin-top: 1.9rem;
-}
-
 .headword {
   font-size: clamp(2.3rem, 8vw, 3.4rem);
   font-weight: 600;
@@ -266,7 +268,7 @@ p {
   display: flex;
   flex-wrap: wrap;
   gap: 0.55rem 0.7rem;
-  margin-top: 1rem;
+  margin-top: 0.5rem;
 }
 
 .hint-slot-open {
@@ -367,7 +369,7 @@ p {
 }
 
 .guess-list {
-  margin: 0.2rem 0 0;
+  margin: 1.2rem 0 0;
   padding: 0;
   list-style: none;
 }
@@ -496,6 +498,13 @@ p {
   color: var(--pencil-red);
   font-style: italic;
   text-align: center;
+}
+
+@keyframes word-appears {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
 }
 
 @keyframes guess-appears {

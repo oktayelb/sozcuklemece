@@ -34,15 +34,16 @@ class BertEncoder:
         return self.model.encode(texts, normalize_embeddings=True, show_progress_bar=False)
 
 
+class PreparedWord:
+    def __init__(self, puzzle, right_vectors, wrong_vectors):
+        self.puzzle = puzzle
+        self.right_vectors = right_vectors
+        self.wrong_vectors = wrong_vectors
+
+
 class MeaningJudge:
-    def __init__(self, encoder, puzzles):
+    def __init__(self, encoder):
         self.encoder = encoder
-        self.right_vectors = {}
-        self.wrong_vectors = {}
-        for puzzle in puzzles:
-            right_meanings = [puzzle["definition"]] + puzzle["also_accepted"]
-            self.right_vectors[puzzle["word"]] = self.encode_all(right_meanings)
-            self.wrong_vectors[puzzle["word"]] = self.encode_all(puzzle["wrong_meanings"])
         self.encode_guess = lru_cache(maxsize=GUESS_CACHE_SIZE)(self.encode_single)
 
     def encode_all(self, texts):
@@ -52,10 +53,21 @@ class MeaningJudge:
     def encode_single(self, normalized_text):
         return self.encoder.encode([normalized_text])[0]
 
-    def similarity(self, puzzle, guess):
+    def prepare(self, puzzle):
+        right_vectors = self.encode_all([puzzle["definition"]] + puzzle["also_accepted"])
+        wrong_vectors = None
+        if puzzle["wrong_meanings"]:
+            wrong_vectors = self.encode_all(puzzle["wrong_meanings"])
+        return PreparedWord(puzzle, right_vectors, wrong_vectors)
+
+    def forget_guesses(self):
+        self.encode_guess.cache_clear()
+
+    def similarity(self, word, guess):
         guess_vector = self.encode_guess(normalize_text(guess))
-        word = puzzle["word"]
-        closest_right = float((self.right_vectors[word] @ guess_vector).max())
-        closest_wrong = float((self.wrong_vectors[word] @ guess_vector).max())
+        closest_right = float((word.right_vectors @ guess_vector).max())
+        if word.wrong_vectors is None:
+            return closest_right
+        closest_wrong = float((word.wrong_vectors @ guess_vector).max())
         wrong_side_excess = max(0.0, closest_wrong - closest_right)
         return closest_right - wrong_side_excess

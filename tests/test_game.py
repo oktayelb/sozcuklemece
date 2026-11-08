@@ -1,7 +1,15 @@
 import pytest
 
-from backend.game import GAME_SECONDS, HINT_PENALTY, Game, closeness_label, repeats_the_word
-from backend.similarity import WIN_SIMILARITY, closeness_percent, normalize_text
+from backend.game import (
+    GAME_RESULT_GRACE_SECONDS,
+    GAME_SECONDS,
+    HINT_PENALTY,
+    Game,
+    closeness_label,
+    remove_stale_games,
+    repeats_the_word,
+)
+from backend.similarity import WIN_SIMILARITY, PreparedWord, closeness_percent, normalize_text
 
 PUZZLE = {
     "word": "sıyırgaç",
@@ -18,12 +26,12 @@ class FixedJudge:
     def __init__(self, similarity):
         self.fixed_similarity = similarity
 
-    def similarity(self, puzzle, guess):
+    def similarity(self, word, guess):
         return self.fixed_similarity
 
 
 def new_game():
-    return Game(PUZZLE, started_at=START)
+    return Game(PreparedWord(PUZZLE, None, None), started_at=START)
 
 
 def test_full_score_at_first_moment():
@@ -118,6 +126,35 @@ def test_explaining_with_the_root_is_allowed():
 def test_inflected_forms_of_the_word_are_detected(guess):
     verb_puzzle = {"word": "evimsemek", "inflected_stems": ["evimse"]}
     assert repeats_the_word(guess, verb_puzzle)
+
+
+@pytest.mark.parametrize("guess", ["göz kulak", "gözkulak", "göz-kulak", "GÖZ KULAK olmak"])
+def test_word_written_with_a_space_or_hyphen_is_detected(guess):
+    assert repeats_the_word(guess, {"word": "göz-kulak"})
+
+
+def test_stem_is_matched_whatever_its_case():
+    assert repeats_the_word("evimsedim", {"word": "evimsemek", "inflected_stems": ["EVİMSE"]})
+
+
+def test_stem_with_no_letters_does_not_reject_every_guess():
+    assert not repeats_the_word("bambaşka bir tahmin", {"word": "evimsemek", "inflected_stems": ["-"]})
+
+
+def test_game_stays_until_its_result_can_no_longer_be_requested():
+    game = new_game()
+    assert not game.is_stale(START + GAME_SECONDS + GAME_RESULT_GRACE_SECONDS - 1)
+    assert game.is_stale(START + GAME_SECONDS + GAME_RESULT_GRACE_SECONDS)
+
+
+def test_only_stale_games_are_removed():
+    old_game = new_game()
+    young_game = Game(PreparedWord(PUZZLE, None, None), started_at=START + 100)
+    games = {old_game.id: old_game, young_game.id: young_game}
+
+    remove_stale_games(games, START + GAME_SECONDS + GAME_RESULT_GRACE_SECONDS)
+
+    assert list(games) == [young_game.id]
 
 
 def test_too_short_guess_is_rejected():

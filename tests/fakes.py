@@ -14,3 +14,18 @@ class ExactMatchEncoder:
                 self.position_of_text[text] = len(self.position_of_text)
             vectors[row, self.position_of_text[text]] = 1.0
         return vectors
+
+
+class RecordingEncoder(ExactMatchEncoder):
+    def __init__(self):
+        super().__init__()
+        self.encoded_texts = []
+
+    def encode(self, texts):
+        self.encoded_texts.extend(texts)
+        return super().encode(texts)
+
+
+class BrokenEncoder(ExactMatchEncoder):
+    def encode(self, texts):
+        raise RuntimeError("model çalışmadı")

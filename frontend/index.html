@@ -12,21 +12,19 @@
     <section id="landing-screen" class="screen landing">
       <h1 class="logo">Sözcüklemece</h1>
       <p class="logo-gloss"><em>isim.</em> Daha önce hiç duyulmamış bir sözcüğün anlamını üç dakikada bulma oyunu.</p>
-      <div id="play-buttons" class="play-buttons"></div>
+      <div class="play-area">
+        <button id="play-button" class="button button-play" type="button" hidden>Oyna</button>
+      </div>
       <p id="error-banner" class="error-banner" role="alert" hidden></p>
       <p id="today-date" class="today-date"></p>
     </section>
 
     <section id="game-screen" class="screen" hidden>
       <header class="game-header">
+        <h2 id="game-word" class="headword game-word"></h2>
         <span id="timer-text" class="timer" role="timer">3:00</span>
         <div class="time-bar"><div id="time-bar-fill" class="time-bar-fill"></div></div>
       </header>
-
-      <article class="entry">
-        <h2 id="game-word" class="headword"></h2>
-        <div id="hint-list" class="hint-list"></div>
-      </article>
 
       <form id="guess-form" class="guess-form" autocomplete="off">
         <label for="guess-input" class="guess-label">Sence ne demek?</label>
@@ -36,6 +34,8 @@
         </div>
       </form>
       <p id="guess-feedback" class="feedback" aria-live="polite"></p>
+
+      <div id="hint-list" class="hint-list"></div>
       <ol id="guess-list" class="guess-list"></ol>
     </section>
 

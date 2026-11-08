@@ -3,6 +3,7 @@ import uuid
 from backend.similarity import WIN_SIMILARITY, closeness_percent, normalize_text
 
 GAME_SECONDS = 180
+GAME_RESULT_GRACE_SECONDS = 120
 BASE_SCORE = 1000
 MAX_TIME_PENALTY = 500
 HINT_PENALTY = 150
@@ -29,19 +30,31 @@ def closeness_label(closeness):
     return "Uzak"
 
 
+def compact_text(text):
+    return normalize_text(text).replace(" ", "").replace("-", "")
+
+
 def repeats_the_word(guess, puzzle):
-    compact_guess = normalize_text(guess).replace(" ", "").replace("-", "")
-    forbidden_forms = [normalize_text(puzzle["word"])] + puzzle.get("inflected_stems", [])
+    compact_guess = compact_text(guess)
+    forbidden_forms = [puzzle["word"]] + puzzle.get("inflected_stems", [])
     for form in forbidden_forms:
-        if form in compact_guess:
+        compact_form = compact_text(form)
+        if compact_form and compact_form in compact_guess:
             return True
     return False
 
 
+def remove_stale_games(games, now):
+    for game_id, game in list(games.items()):
+        if game.is_stale(now):
+            del games[game_id]
+
+
 class Game:
-    def __init__(self, puzzle, started_at):
+    def __init__(self, word, started_at):
         self.id = uuid.uuid4().hex
-        self.puzzle = puzzle
+        self.word = word
+        self.puzzle = word.puzzle
         self.started_at = started_at
         self.used_hints = []
         self.guess_count = 0
@@ -50,6 +63,9 @@ class Game:
         self.won = False
         self.final_score = 0
         self.seconds_used = 0.0
+
+    def is_stale(self, now):
+        return now - self.started_at >= GAME_SECONDS + GAME_RESULT_GRACE_SECONDS
 
     def remaining_seconds(self, now):
         if self.finished:
@@ -122,7 +138,7 @@ class Game:
         if repeats_the_word(text, self.puzzle):
             return self.guess_response(now, "Sözcüğün kendisini kullanmadan anlat.", rejected=True)
 
-        similarity = judge.similarity(self.puzzle, text)
+        similarity = judge.similarity(self.word, text)
         if similarity >= WIN_SIMILARITY:
             closeness = WIN_CLOSENESS
             self.finish(now, won=True)

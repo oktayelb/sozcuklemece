@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Sözcüklemece yönetim</title>
+  <link rel="stylesheet" href="../style.css">
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+  <main class="sheet">
+    <h1 class="admin-title">Günün sözcüğü</h1>
+
+    <label class="admin-field admin-token">
+      <span class="admin-label">Parola</span>
+      <input id="admin-token" type="password" autocomplete="current-password">
+    </label>
+    <p id="word-status" class="admin-status" role="status">Parolayı girince yayındaki sözcük görünür.</p>
+
+    <form id="word-form" class="admin-form" autocomplete="off">
+      <label class="admin-field">
+        <span class="admin-label">Sözcük</span>
+        <input name="word" maxlength="60" required>
+      </label>
+
+      <label class="admin-field">
+        <span class="admin-label">Tanım</span>
+        <span class="admin-help">Oyun sonunda gösterilir, tahminler bununla karşılaştırılır.</span>
+        <textarea name="definition" rows="2" maxlength="500" required></textarea>
+      </label>
+
+      <fieldset class="admin-group">
+        <legend>İpuçları</legend>
+        <label class="admin-field">
+          <span class="admin-label">Kök ve ekler</span>
+          <input name="parts" maxlength="500" required>
+        </label>
+        <label class="admin-field">
+          <span class="admin-label">Cümlede kullanımı</span>
+          <textarea name="sentence" rows="2" maxlength="500" required></textarea>
+        </label>
+        <div class="admin-row">
+          <label class="admin-field">
+            <span class="admin-label">Kategori</span>
+            <input name="category" maxlength="60" required>
+          </label>
+          <label class="admin-field">
+            <span class="admin-label">Alan</span>
+            <input name="field" maxlength="60" required>
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset class="admin-group">
+        <legend>Tahmin doğruluğu</legend>
+        <p class="admin-help">Her satıra bir tane yaz. Boş bırakılabilir ama doğruluğu düşürür.</p>
+        <label class="admin-field">
+          <span class="admin-label">Doğru sayılacak kısa anlatımlar</span>
+          <span class="admin-help">Boş kalırsa doğru ama farklı sözlerle yazılmış tahminler kazanamayabilir.</span>
+          <textarea name="also_accepted" rows="4"></textarea>
+        </label>
+        <label class="admin-field">
+          <span class="admin-label">Yanlış anlamlar</span>
+          <span class="admin-help">Tanımın zıttını ve fazla genel anlatımları yaz. Boş kalırsa zıt anlamlı tahminler de kazanabilir.</span>
+          <textarea name="wrong_meanings" rows="4"></textarea>
+        </label>
+        <label class="admin-field">
+          <span class="admin-label">Çekimli kökler</span>
+          <span class="admin-help">Sözcük fiilse çekimli hali de tahminde yasak olur, ör. evimsemek için evimse.</span>
+          <textarea name="inflected_stems" rows="2"></textarea>
+        </label>
+      </fieldset>
+
+      <button id="publish-button" class="button admin-publish" type="submit">Yayınla</button>
+      <p class="admin-help">Yayınlanan sözcük hemen oyuna girer, önceki sözcük silinir. 24 saat sonra kendiliğinden silinir.</p>
+      <p id="form-message" class="admin-message" role="alert"></p>
+    </form>
+  </main>
+  <script src="admin.js"></script>
+</body>
+</html>

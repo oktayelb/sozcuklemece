@@ -1,24 +1,31 @@
+import asyncio
 import math
+import os
+import secrets
 import time
 from contextlib import asynccontextmanager
+from datetime import datetime
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 
+from backend.daily_word import (
+    GAME_TIMEZONE,
+    WORD_FILE,
+    DailyWordStore,
+    current_game_day,
+)
 from backend.game import (
     GAME_SECONDS,
     HINT_LABELS,
     HINT_PENALTY,
     Game,
-)
-from backend.puzzles import (
-    WORDS_PER_DAY,
-    current_game_day,
-    load_puzzles,
-    puzzles_for_day,
+    remove_stale_games,
 )
 from backend.rate_limit import (
+    ADMIN_LIMIT,
+    ADMIN_WINDOW_SECONDS,
     GAME_START_LIMIT,
     GAME_START_WINDOW_SECONDS,
     GUESS_LIMIT,
@@ -34,23 +41,42 @@ from backend.schemas import (
     HintOption,
     HintRequest,
     HintResponse,
-    StartRequest,
     StartResponse,
     TodayResponse,
+    WordStatusResponse,
+    WordUpload,
 )
 from backend.similarity import BertEncoder, MeaningJudge
 
 FRONTEND_DIRECTORY = Path(__file__).parent.parent / "frontend"
+ADMIN_TOKEN_VARIABLE = "ADMIN_TOKEN"
+ADMIN_TOKEN_HEADER = "X-Admin-Token"
+CLEANUP_INTERVAL_SECONDS = 60
+
+
+def remove_expired_state(app):
+    app.state.word_store.drop_expired_word(time.time())
+    remove_stale_games(app.state.games, time.monotonic())
+
+
+async def clean_up_periodically(app):
+    while True:
+        await asyncio.sleep(CLEANUP_INTERVAL_SECONDS)
+        remove_expired_state(app)
 
 
 @asynccontextmanager
 async def lifespan(app):
-    app.state.puzzles = load_puzzles()
-    app.state.judge = MeaningJudge(BertEncoder(), app.state.puzzles)
+    app.state.judge = MeaningJudge(BertEncoder())
+    app.state.word_store = DailyWordStore(app.state.judge, WORD_FILE)
+    app.state.word_store.load_saved_word(time.time())
     app.state.games = {}
     app.state.game_start_limiter = RateLimiter(GAME_START_LIMIT, GAME_START_WINDOW_SECONDS)
     app.state.guess_limiter = RateLimiter(GUESS_LIMIT, GUESS_WINDOW_SECONDS)
+    app.state.admin_limiter = RateLimiter(ADMIN_LIMIT, ADMIN_WINDOW_SECONDS)
+    cleanup_task = asyncio.create_task(clean_up_periodically(app))
     yield
+    cleanup_task.cancel()
 
 
 app = FastAPI(title="Sözcüklemece", lifespan=lifespan)
@@ -74,20 +100,50 @@ def enforce_rate_limit(request, limiter):
         )
 
 
+def require_admin(request: Request):
+    enforce_rate_limit(request, request.app.state.admin_limiter)
+    expected_token = os.environ.get(ADMIN_TOKEN_VARIABLE, "")
+    if not expected_token:
+        raise HTTPException(status_code=503, detail="Sunucuda ADMIN_TOKEN ayarlanmamış.")
+    given_token = request.headers.get(ADMIN_TOKEN_HEADER, "")
+    if not secrets.compare_digest(given_token.encode(), expected_token.encode()):
+        raise HTTPException(status_code=401, detail="Parola yanlış.")
+
+
+def word_status(store):
+    word = store.current_word(time.time())
+    if word is None:
+        return WordStatusResponse(word=None, expires_at=None)
+    expires_at = datetime.fromtimestamp(store.expires_at, GAME_TIMEZONE)
+    return WordStatusResponse(word=word.puzzle["word"], expires_at=expires_at.isoformat())
+
+
 @app.get("/api/today", response_model=TodayResponse)
-def get_today():
-    return TodayResponse(date=current_game_day().isoformat(), word_count=WORDS_PER_DAY)
+def get_today(request: Request):
+    word = request.app.state.word_store.current_word(time.time())
+    return TodayResponse(date=current_game_day().isoformat(), word_available=word is not None)
+
+
+@app.get("/api/admin/word", response_model=WordStatusResponse, dependencies=[Depends(require_admin)])
+def get_word_status(request: Request):
+    return word_status(request.app.state.word_store)
+
+
+@app.post("/api/admin/word", response_model=WordStatusResponse, dependencies=[Depends(require_admin)])
+def publish_word(body: WordUpload, request: Request):
+    request.app.state.word_store.publish(body.model_dump(), time.time())
+    return word_status(request.app.state.word_store)
 
 
 @app.post("/api/games", response_model=StartResponse)
-def start_game(body: StartRequest, request: Request):
+def start_game(request: Request):
     enforce_rate_limit(request, request.app.state.game_start_limiter)
-    if body.slot >= WORDS_PER_DAY:
-        raise HTTPException(status_code=404, detail="Bugün için böyle bir sözcük yok.")
+    word = request.app.state.word_store.current_word(time.time())
+    if word is None:
+        raise HTTPException(status_code=404, detail="Bugünün sözcüğü henüz hazır değil.")
 
-    todays_puzzles = puzzles_for_day(request.app.state.puzzles, current_game_day())
     now = time.monotonic()
-    game = Game(todays_puzzles[body.slot], started_at=now)
+    game = Game(word, started_at=now)
     request.app.state.games[game.id] = game
 
     hint_options = []

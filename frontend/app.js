@@ -100,28 +100,17 @@ function formatClock(totalSeconds) {
   return `${minutes}:${seconds}`;
 }
 
-function playButtonLabel(slot, wordCount) {
-  if (wordCount === 1) {
-    return "Oyna";
-  }
-  return `${slot + 1}. sözcüğü oyna`;
-}
-
 async function loadLandingPage() {
   clearError();
   showScreen("landing-screen");
-  const container = element("play-buttons");
-  container.replaceChildren();
+  element("play-button").hidden = true;
   try {
     const today = await callApi("/api/today");
     element("today-date").textContent = formatDate(today.date);
-    for (let slot = 0; slot < today.word_count; slot += 1) {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "button button-play";
-      button.textContent = playButtonLabel(slot, today.word_count);
-      button.addEventListener("click", () => startGame(slot));
-      container.append(button);
+    if (today.word_available) {
+      element("play-button").hidden = false;
+    } else {
+      showError("Bugünün sözcüğü henüz hazır değil. Biraz sonra tekrar dene.");
     }
   } catch (error) {
     showError("Sunucuya ulaşılamadı. Sayfayı yenileyip tekrar dene.");
@@ -232,9 +221,11 @@ async function submitGuess(event) {
 
   game.isSubmitting = true;
   element("guess-button").disabled = true;
-  playPencilSound();
   try {
     const response = await callApi(`/api/games/${game.id}/guesses`, { text });
+    if (response.won) {
+      playPencilSound();
+    }
     if (response.finished) {
       endGame();
       return;
@@ -255,14 +246,14 @@ async function submitGuess(event) {
   }
 }
 
-async function startGame(slot) {
+async function startGame() {
   if (game.isStarting) {
     return;
   }
   game.isStarting = true;
   clearError();
   try {
-    const started = await callApi("/api/games", { slot });
+    const started = await callApi("/api/games", {});
 
     game.id = started.game_id;
     game.durationSeconds = started.duration_seconds;
@@ -323,6 +314,7 @@ function renderResult(result) {
   showScreen("result-screen");
 }
 
+element("play-button").addEventListener("click", startGame);
 element("guess-form").addEventListener("submit", submitGuess);
 element("home-button").addEventListener("click", loadLandingPage);
 
