@@ -54,6 +54,10 @@ Oyun başlatılırken Cloudflare Turnstile ile doğrulama yapılır. Görünmez 
 
 `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` ve `TURNSTILE_HOSTNAME` zorunludur. Anahtarlar Cloudflare panelinden alınır, `TURNSTILE_HOSTNAME` sitenin alan adıdır (ör. `sozcuklemece.com`). Arka uç jetonun bu alan adında ve `start_game` eylemi için alındığını da denetler. `.env.example` içindekiler Cloudflare'in her zaman geçen test anahtarlarıdır, yalnızca yerelde kullan. Test anahtarlarında alan adı ve eylem denetlenmez. Cloudflare'e ulaşılamazsa oyun başlatılamaz (503).
 
+## Günde bir oyun
+
+Tarayıcı ilk açılışta rastgele bir oyuncu kimliği üretip `localStorage`'da saklar ve oyunu başlatırken gönderir. Arka uç her kimliğe o sözcük için tek oyun verir. Oyun sürerken yeniden başlatılırsa aynı oyun, açılmış ipuçları ve tahminlerle kaldığı yerden sürer. Oyun bittikten sonra yeni oyun yerine sonuç gösterilir. Kayıtlar bellekte durur ve yeni sözcükle sıfırlanır. Kimlik tarayıcı verisiyle silinebildiği için bu bir hile engeli değil, dürüst oyuncu için bir kuraldır.
+
 ## Önbellek ve CDN
 
 nginx ön yüz dosyalarını önbellek başlıklarıyla sunar: HTML, JS ve CSS 5 dakika, yazı tipleri ve sesler 30 gün. `/api/` yanıtları hiç önbelleğe alınmaz. Önüne bir CDN (ör. Cloudflare) konursa nginx'e `set_real_ip_from` ve `real_ip_header` eklenmeli, yoksa bütün oyuncular CDN'in IP'si sayılır.

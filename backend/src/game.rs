@@ -67,8 +67,64 @@ pub fn repeats_the_word(guess: &str, puzzle: &Puzzle) -> bool {
     false
 }
 
-pub fn remove_stale_games(games: &mut HashMap<String, Game>, now: f64) {
-    games.retain(|_, game| !game.is_stale(now));
+pub fn remove_stale_games(games: &mut HashMap<String, Game>, now: f64) -> Vec<Game> {
+    let mut stale_ids = Vec::new();
+    for (id, game) in games.iter() {
+        if game.is_stale(now) {
+            stale_ids.push(id.clone());
+        }
+    }
+    let mut removed = Vec::new();
+    for id in stale_ids {
+        if let Some(mut game) = games.remove(&id) {
+            game.finish(now, false);
+            removed.push(game);
+        }
+    }
+    removed
+}
+
+fn category_text(puzzle: &Puzzle) -> String {
+    format!("{} · {}", puzzle.category, puzzle.field)
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Outcome {
+    pub won: bool,
+    pub score: i64,
+    pub seconds_used: i64,
+    pub hints_used: usize,
+    pub guess_count: u32,
+    pub best_closeness: i64,
+}
+
+pub fn game_result(puzzle: &Puzzle, outcome: &Outcome) -> FinishResponse {
+    FinishResponse {
+        word: puzzle.word.clone(),
+        definition: puzzle.definition.clone(),
+        parts: puzzle.parts.clone(),
+        sentence: puzzle.sentence.clone(),
+        category: category_text(puzzle),
+        won: outcome.won,
+        score: outcome.score,
+        seconds_used: outcome.seconds_used,
+        hints_used: outcome.hints_used,
+        guess_count: outcome.guess_count,
+        best_closeness: outcome.best_closeness,
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct RevealedHint {
+    pub kind: HintKind,
+    pub text: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct JudgedGuess {
+    pub text: String,
+    pub closeness: i64,
+    pub label: &'static str,
 }
 
 #[derive(Debug, PartialEq, Serialize)]
@@ -114,9 +170,11 @@ pub enum GuessCheck {
 
 pub struct Game {
     pub id: String,
+    pub player_id: String,
     pub word: Arc<PreparedWord>,
     started_at: f64,
     used_hints: Vec<HintKind>,
+    judged_guesses: Vec<JudgedGuess>,
     guess_count: u32,
     best_closeness: i64,
     finished: bool,
@@ -127,12 +185,14 @@ pub struct Game {
 }
 
 impl Game {
-    pub fn new(word: Arc<PreparedWord>, started_at: f64) -> Game {
+    pub fn new(word: Arc<PreparedWord>, player_id: String, started_at: f64) -> Game {
         Game {
             id: Uuid::new_v4().simple().to_string(),
+            player_id,
             word,
             started_at,
             used_hints: Vec::new(),
+            judged_guesses: Vec::new(),
             guess_count: 0,
             best_closeness: 0,
             finished: false,
@@ -145,6 +205,10 @@ impl Game {
 
     pub fn puzzle(&self) -> &Puzzle {
         &self.word.puzzle
+    }
+
+    pub fn is_finished(&self) -> bool {
+        self.finished
     }
 
     pub fn is_stale(&self, now: f64) -> bool {
@@ -185,7 +249,7 @@ impl Game {
         self.finished = true;
     }
 
-    fn finish_if_time_is_up(&mut self, now: f64) {
+    pub fn finish_if_time_is_up(&mut self, now: f64) {
         if self.remaining_seconds(now) <= 0.0 {
             self.finish(now, false);
         }
@@ -196,8 +260,23 @@ impl Game {
         match kind {
             HintKind::Parts => puzzle.parts.clone(),
             HintKind::Sentence => puzzle.sentence.clone(),
-            HintKind::Category => format!("{} · {}", puzzle.category, puzzle.field),
+            HintKind::Category => category_text(puzzle),
         }
+    }
+
+    pub fn revealed_hints(&self) -> Vec<RevealedHint> {
+        let mut revealed = Vec::new();
+        for kind in &self.used_hints {
+            revealed.push(RevealedHint {
+                kind: *kind,
+                text: self.hint_text(*kind),
+            });
+        }
+        revealed
+    }
+
+    pub fn judged_guesses(&self) -> Vec<JudgedGuess> {
+        self.judged_guesses.clone()
     }
 
     pub fn reveal_hint(&mut self, kind: HintKind, now: f64) -> HintResponse {
@@ -269,7 +348,7 @@ impl Game {
         GuessCheck::NeedsJudging(self.word.clone())
     }
 
-    pub fn record_judged_guess(&mut self, similarity: f64, now: f64) -> GuessResponse {
+    pub fn record_judged_guess(&mut self, text: &str, similarity: f64, now: f64) -> GuessResponse {
         self.finish_if_time_is_up(now);
         if self.finished {
             return self.guess_response(now, "Oyun bitti.", None, false);
@@ -282,19 +361,19 @@ impl Game {
         } else {
             closeness = closeness_percent(similarity);
         }
+        let label = closeness_label(closeness);
         self.guess_count += 1;
         self.best_closeness = self.best_closeness.max(closeness);
-        self.guess_response(now, closeness_label(closeness), Some(closeness), false)
+        self.judged_guesses.push(JudgedGuess {
+            text: text.to_string(),
+            closeness,
+            label,
+        });
+        self.guess_response(now, label, Some(closeness), false)
     }
 
-    pub fn result(&self) -> FinishResponse {
-        let puzzle = self.puzzle();
-        FinishResponse {
-            word: puzzle.word.clone(),
-            definition: puzzle.definition.clone(),
-            parts: puzzle.parts.clone(),
-            sentence: puzzle.sentence.clone(),
-            category: self.hint_text(HintKind::Category),
+    pub fn outcome(&self) -> Outcome {
+        Outcome {
             won: self.won,
             score: self.final_score,
             seconds_used: self.seconds_used.round_ties_even() as i64,
@@ -302,6 +381,10 @@ impl Game {
             guess_count: self.guess_count,
             best_closeness: self.best_closeness,
         }
+    }
+
+    pub fn result(&self) -> FinishResponse {
+        game_result(self.puzzle(), &self.outcome())
     }
 }
 
@@ -340,6 +423,7 @@ mod tests {
     fn game_started_at(started_at: f64) -> Game {
         Game::new(
             Arc::new(PreparedWord::new(puzzle(), vec![], vec![])),
+            "oyuncu".to_string(),
             started_at,
         )
     }
@@ -352,7 +436,7 @@ mod tests {
         match game.check_guess(text, now) {
             GuessCheck::TooSoon { .. } => panic!("tahmin aralığı beklenmedi"),
             GuessCheck::Answered(response) => response,
-            GuessCheck::NeedsJudging(_) => game.record_judged_guess(similarity, now),
+            GuessCheck::NeedsJudging(_) => game.record_judged_guess(text, similarity, now),
         }
     }
 
@@ -451,7 +535,7 @@ mod tests {
         };
         game.finish(START + 1.0, false);
 
-        let response = game.record_judged_guess(0.99, START);
+        let response = game.record_judged_guess("sosu silen ekmek", 0.99, START);
 
         assert!(!response.won);
         assert_eq!(game.result().guess_count, 0);
@@ -539,10 +623,26 @@ mod tests {
         games.insert(old_game.id.clone(), old_game);
         games.insert(young_game.id.clone(), young_game);
 
-        remove_stale_games(&mut games, START + GAME_SECONDS + GAME_RESULT_GRACE_SECONDS);
+        let removed =
+            remove_stale_games(&mut games, START + GAME_SECONDS + GAME_RESULT_GRACE_SECONDS);
 
+        assert_eq!(removed.len(), 1);
+        assert!(removed[0].is_finished());
         let remaining: Vec<&String> = games.keys().collect();
         assert_eq!(remaining, vec![&young_game_id]);
+    }
+
+    #[test]
+    fn judged_guesses_and_hints_are_remembered() {
+        let mut game = new_game();
+        game.reveal_hint(HintKind::Parts, START);
+        submit(&mut game, "sosu silen kaşık", 0.3, START);
+
+        assert_eq!(game.revealed_hints()[0].text, "sıyır- + -gaç");
+        let guesses = game.judged_guesses();
+        assert_eq!(guesses.len(), 1);
+        assert_eq!(guesses[0].text, "sosu silen kaşık");
+        assert_eq!(guesses[0].closeness, closeness_percent(0.3));
     }
 
     #[test]

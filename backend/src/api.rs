@@ -18,15 +18,17 @@ use crate::daily_word::{DailyWordStore, StoreError, game_day, moment_in_game_tim
 use crate::encoder::{EncoderError, TeiEncoder};
 use crate::game::{
     FinishResponse, GAME_SECONDS, GUESS_INTERVAL_SECONDS, Game, GuessCheck, GuessResponse,
-    HINT_KINDS, HINT_PENALTY, HintKind, HintResponse, MAX_GUESS_LENGTH, remove_stale_games,
+    HINT_KINDS, HINT_PENALTY, HintKind, HintResponse, JudgedGuess, MAX_GUESS_LENGTH, RevealedHint,
+    game_result, remove_stale_games,
 };
+use crate::players::{PlayerDay, TodaysPlayers, is_valid_player_id};
 use crate::puzzle::Puzzle;
 use crate::rate_limit::{
     ADMIN_LIMIT, ADMIN_WINDOW_SECONDS, GAME_START_LIMIT, GAME_START_WINDOW_SECONDS, GUESS_LIMIT,
     GUESS_WINDOW_SECONDS, HINT_LIMIT, HINT_WINDOW_SECONDS, RESULT_LIMIT, RESULT_WINDOW_SECONDS,
     RateLimiter, UNKNOWN_CLIENT, rate_limit_key,
 };
-use crate::similarity::MeaningJudge;
+use crate::similarity::{MeaningJudge, PreparedWord};
 use crate::turnstile::{HumanCheck, START_GAME_ACTION, TurnstileVerifier};
 
 pub const ADMIN_TOKEN_HEADER: &str = "x-admin-token";
@@ -37,6 +39,7 @@ pub struct AppState {
     pub judge: Arc<MeaningJudge>,
     pub word_store: DailyWordStore,
     pub games: Mutex<HashMap<String, Game>>,
+    pub players: Mutex<TodaysPlayers>,
     turnstile: TurnstileVerifier,
     game_start_limiter: Mutex<RateLimiter>,
     guess_limiter: Mutex<RateLimiter>,
@@ -60,6 +63,7 @@ impl AppState {
             judge,
             word_store,
             games: Mutex::new(HashMap::new()),
+            players: Mutex::new(TodaysPlayers::new()),
             turnstile,
             game_start_limiter: Mutex::new(RateLimiter::new(
                 GAME_START_LIMIT,
@@ -75,13 +79,18 @@ impl AppState {
     pub fn remove_expired_state(&self) {
         self.word_store.drop_expired_word(self.clock.unix_seconds());
         let mut games = self.games.lock().unwrap();
-        remove_stale_games(&mut games, self.clock.monotonic_seconds());
+        let removed_games = remove_stale_games(&mut games, self.clock.monotonic_seconds());
+        let mut players = self.players.lock().unwrap();
+        for game in &removed_games {
+            players.record_finish(game);
+        }
     }
 }
 
 pub enum ApiError {
     GameNotFound,
     WordNotReady,
+    AlreadyPlayed,
     TooManyRequests { seconds_to_wait: f64 },
     AdminDisabled,
     WrongPassword,
@@ -123,6 +132,10 @@ impl IntoResponse for ApiError {
             ApiError::WordNotReady => (
                 StatusCode::NOT_FOUND,
                 "Bugünün sözcüğü henüz hazır değil.".to_string(),
+            ),
+            ApiError::AlreadyPlayed => (
+                StatusCode::CONFLICT,
+                "Bugünün sözcüğünü zaten oynadın.".to_string(),
             ),
             ApiError::TooManyRequests { .. } => (
                 StatusCode::TOO_MANY_REQUESTS,
@@ -283,11 +296,28 @@ struct StartResponse {
     guess_interval_seconds: f64,
     remaining_seconds: f64,
     score: i64,
+    revealed_hints: Vec<RevealedHint>,
+    guesses: Vec<JudgedGuess>,
 }
 
 #[derive(Deserialize)]
 struct StartRequest {
     turnstile_token: String,
+    player_id: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "lowercase")]
+enum PlayerState {
+    New,
+    Playing,
+    Finished,
+}
+
+#[derive(Serialize)]
+struct PlayerTodayResponse {
+    state: PlayerState,
+    result: Option<FinishResponse>,
 }
 
 #[derive(Deserialize)]
@@ -351,11 +381,75 @@ async fn publish_word(
     Ok(Json(word_status(&state)))
 }
 
+fn start_response(game: &Game, now: f64) -> StartResponse {
+    let mut hints = Vec::new();
+    for kind in HINT_KINDS {
+        hints.push(HintOption {
+            kind,
+            label: kind.label(),
+        });
+    }
+    StartResponse {
+        game_id: game.id.clone(),
+        word: game.puzzle().word.clone(),
+        hints,
+        duration_seconds: GAME_SECONDS as i64,
+        hint_penalty: HINT_PENALTY,
+        guess_interval_seconds: GUESS_INTERVAL_SECONDS,
+        remaining_seconds: game.remaining_seconds(now),
+        score: game.current_score(now),
+        revealed_hints: game.revealed_hints(),
+        guesses: game.judged_guesses(),
+    }
+}
+
+fn current_day_of_player(
+    games: &mut HashMap<String, Game>,
+    players: &mut TodaysPlayers,
+    word: &Arc<PreparedWord>,
+    player_id: &str,
+    now: f64,
+) -> Option<PlayerDay> {
+    players.follow_word(word);
+    let day = players.day_of(player_id)?;
+    let PlayerDay::Playing { game_id } = &day else {
+        return Some(day);
+    };
+    let game = games.get_mut(game_id)?;
+    game.finish_if_time_is_up(now);
+    players.record_finish(game);
+    players.day_of(player_id)
+}
+
+fn game_to_continue(
+    games: &mut HashMap<String, Game>,
+    players: &mut TodaysPlayers,
+    word: &Arc<PreparedWord>,
+    player_id: &str,
+    now: f64,
+) -> Result<Option<StartResponse>, ApiError> {
+    match current_day_of_player(games, players, word, player_id, now) {
+        None => Ok(None),
+        Some(PlayerDay::Finished { .. }) => Err(ApiError::AlreadyPlayed),
+        Some(PlayerDay::Playing { game_id }) => Ok(Some(start_response(&games[&game_id], now))),
+    }
+}
+
+fn check_player_id(player_id: &str) -> Result<(), ApiError> {
+    if is_valid_player_id(player_id) {
+        return Ok(());
+    }
+    Err(ApiError::InvalidInput(
+        "Oyuncu kimliği geçersiz.".to_string(),
+    ))
+}
+
 async fn start_game(
     State(state): State<Arc<AppState>>,
     client: Client,
     Json(body): Json<StartRequest>,
 ) -> Result<Json<StartResponse>, ApiError> {
+    check_player_id(&body.player_id)?;
     enforce_rate_limit(
         &state.game_start_limiter,
         &client.rate_limit_key,
@@ -364,6 +458,17 @@ async fn start_game(
     let Some(live) = state.word_store.current_word(state.clock.unix_seconds()) else {
         return Err(ApiError::WordNotReady);
     };
+    {
+        let now = state.clock.monotonic_seconds();
+        let mut games = state.games.lock().unwrap();
+        let mut players = state.players.lock().unwrap();
+        let existing_game =
+            game_to_continue(&mut games, &mut players, &live.word, &body.player_id, now)?;
+        if let Some(response) = existing_game {
+            return Ok(Json(response));
+        }
+    }
+
     match state
         .turnstile
         .verify(&body.turnstile_token, client.known_ip())
@@ -375,25 +480,52 @@ async fn start_game(
     }
 
     let now = state.clock.monotonic_seconds();
-    let game = Game::new(live.word, now);
-    let mut hints = Vec::new();
-    for kind in HINT_KINDS {
-        hints.push(HintOption {
-            kind,
-            label: kind.label(),
-        });
+    let mut games = state.games.lock().unwrap();
+    let mut players = state.players.lock().unwrap();
+    let existing_game =
+        game_to_continue(&mut games, &mut players, &live.word, &body.player_id, now)?;
+    if let Some(response) = existing_game {
+        return Ok(Json(response));
     }
-    let response = StartResponse {
-        game_id: game.id.clone(),
-        word: game.puzzle().word.clone(),
-        hints,
-        duration_seconds: GAME_SECONDS as i64,
-        hint_penalty: HINT_PENALTY,
-        guess_interval_seconds: GUESS_INTERVAL_SECONDS,
-        remaining_seconds: game.remaining_seconds(now),
-        score: game.current_score(now),
+    let game = Game::new(live.word, body.player_id, now);
+    let response = start_response(&game, now);
+    players.record_start(&game);
+    games.insert(game.id.clone(), game);
+    Ok(Json(response))
+}
+
+async fn get_player_today(
+    State(state): State<Arc<AppState>>,
+    client: Client,
+    Path(player_id): Path<String>,
+) -> Result<Json<PlayerTodayResponse>, ApiError> {
+    check_player_id(&player_id)?;
+    enforce_rate_limit(
+        &state.result_limiter,
+        &client.rate_limit_key,
+        state.clock.monotonic_seconds(),
+    )?;
+    let Some(live) = state.word_store.current_word(state.clock.unix_seconds()) else {
+        return Err(ApiError::WordNotReady);
     };
-    state.games.lock().unwrap().insert(game.id.clone(), game);
+    let now = state.clock.monotonic_seconds();
+    let mut games = state.games.lock().unwrap();
+    let mut players = state.players.lock().unwrap();
+    let response =
+        match current_day_of_player(&mut games, &mut players, &live.word, &player_id, now) {
+            None => PlayerTodayResponse {
+                state: PlayerState::New,
+                result: None,
+            },
+            Some(PlayerDay::Playing { .. }) => PlayerTodayResponse {
+                state: PlayerState::Playing,
+                result: None,
+            },
+            Some(PlayerDay::Finished { outcome }) => PlayerTodayResponse {
+                state: PlayerState::Finished,
+                result: Some(game_result(&live.word.puzzle, &outcome)),
+            },
+        };
     Ok(Json(response))
 }
 
@@ -413,7 +545,9 @@ async fn reveal_hint(
     let Some(game) = games.get_mut(&game_id) else {
         return Err(ApiError::GameNotFound);
     };
-    Ok(Json(game.reveal_hint(body.kind, now)))
+    let response = game.reveal_hint(body.kind, now);
+    state.players.lock().unwrap().record_finish(game);
+    Ok(Json(response))
 }
 
 async fn submit_guess(
@@ -444,7 +578,10 @@ async fn submit_guess(
             GuessCheck::TooSoon { seconds_to_wait } => {
                 return Err(ApiError::TooManyRequests { seconds_to_wait });
             }
-            GuessCheck::Answered(response) => return Ok(Json(response)),
+            GuessCheck::Answered(response) => {
+                state.players.lock().unwrap().record_finish(game);
+                return Ok(Json(response));
+            }
             GuessCheck::NeedsJudging(word) => word,
         }
     };
@@ -455,7 +592,9 @@ async fn submit_guess(
     let Some(game) = games.get_mut(&game_id) else {
         return Err(ApiError::GameNotFound);
     };
-    Ok(Json(game.record_judged_guess(similarity, now)))
+    let response = game.record_judged_guess(&body.text, similarity, now);
+    state.players.lock().unwrap().record_finish(game);
+    Ok(Json(response))
 }
 
 async fn finish_game(
@@ -474,6 +613,7 @@ async fn finish_game(
         return Err(ApiError::GameNotFound);
     };
     game.finish(now, false);
+    state.players.lock().unwrap().record_finish(game);
     Ok(Json(game.result()))
 }
 
@@ -481,6 +621,7 @@ pub fn router(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/api/today", get(get_today))
         .route("/api/admin/word", get(get_word_status).post(publish_word))
+        .route("/api/players/{player_id}/today", get(get_player_today))
         .route("/api/games", post(start_game))
         .route("/api/games/{game_id}/hints", post(reveal_hint))
         .route("/api/games/{game_id}/guesses", post(submit_guess))

@@ -4,6 +4,7 @@ pub mod config;
 pub mod daily_word;
 pub mod encoder;
 pub mod game;
+pub mod players;
 pub mod puzzle;
 pub mod rate_limit;
 pub mod similarity;

@@ -12,7 +12,7 @@ use sozcuklemece_backend::rate_limit::{
 use support::{
     ADMIN_TOKEN, FakeTeiMode, FakeTurnstileMode, OTHER_ACTION_TURNSTILE_TOKEN,
     OTHER_SITE_TURNSTILE_TOKEN, PLAYER_IP, TESTING_KEY_TURNSTILE_TOKEN, TURNSTILE_SITE_KEY,
-    TestServer, VALID_TURNSTILE_TOKEN, first_puzzle, game_day_noon, second_puzzle,
+    TestServer, VALID_TURNSTILE_TOKEN, first_puzzle, game_day_noon, new_player_id, second_puzzle,
 };
 
 const UNKNOWN_GUESS: &str = "bambaşka bir açıklama";
@@ -760,7 +760,9 @@ async fn today_gives_the_turnstile_site_key() {
 #[tokio::test]
 async fn start_needs_a_turnstile_token() {
     let server = TestServer::with_word().await;
-    let response = server.post("/api/games", json!({})).await;
+    let response = server
+        .post("/api/games", json!({ "player_id": new_player_id() }))
+        .await;
     assert_eq!(response.status, StatusCode::UNPROCESSABLE_ENTITY);
     assert!(server.state.games.lock().unwrap().is_empty());
 }
@@ -832,4 +834,208 @@ async fn turnstile_is_not_asked_when_there_is_no_word() {
     let server = TestServer::empty().await;
     server.start_game_with_token(VALID_TURNSTILE_TOKEN).await;
     assert!(server.turnstile.requests().is_empty());
+}
+
+async fn start_as(server: &TestServer, player_id: &str) -> Value {
+    let response = server.start_game_as(player_id, VALID_TURNSTILE_TOKEN).await;
+    assert_eq!(response.status, StatusCode::OK, "{}", response.body);
+    response.body
+}
+
+#[tokio::test]
+async fn player_who_finished_cannot_start_again() {
+    let server = TestServer::with_word().await;
+    let player_id = new_player_id();
+    let game_id = start_as(&server, &player_id).await["game_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    server.finish(&game_id).await;
+
+    let second_try = server
+        .start_game_as(&player_id, VALID_TURNSTILE_TOKEN)
+        .await;
+
+    assert_eq!(second_try.status, StatusCode::CONFLICT);
+    assert_eq!(server.state.games.lock().unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn already_played_is_refused_without_asking_cloudflare() {
+    let server = TestServer::with_word().await;
+    let player_id = new_player_id();
+    let game_id = start_as(&server, &player_id).await["game_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    server.finish(&game_id).await;
+
+    server
+        .start_game_as(&player_id, VALID_TURNSTILE_TOKEN)
+        .await;
+
+    assert_eq!(server.turnstile.requests().len(), 1);
+}
+
+#[tokio::test]
+async fn winning_counts_as_played_even_without_finish() {
+    let server = TestServer::with_word().await;
+    let player_id = new_player_id();
+    let game_id = start_as(&server, &player_id).await["game_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    server.guess(&game_id, &first_puzzle().definition).await;
+
+    let second_try = server
+        .start_game_as(&player_id, VALID_TURNSTILE_TOKEN)
+        .await;
+
+    assert_eq!(second_try.status, StatusCode::CONFLICT);
+}
+
+#[tokio::test]
+async fn running_out_of_time_counts_as_played() {
+    let server = TestServer::with_word().await;
+    let player_id = new_player_id();
+    start_as(&server, &player_id).await;
+    server.advance_clock(GAME_SECONDS);
+
+    let second_try = server
+        .start_game_as(&player_id, VALID_TURNSTILE_TOKEN)
+        .await;
+
+    assert_eq!(second_try.status, StatusCode::CONFLICT);
+}
+
+#[tokio::test]
+async fn starting_again_mid_game_continues_the_same_game() {
+    let server = TestServer::with_word().await;
+    let player_id = new_player_id();
+    let first_start = start_as(&server, &player_id).await;
+    let game_id = first_start["game_id"].as_str().unwrap();
+    server
+        .post(
+            &format!("/api/games/{game_id}/hints"),
+            json!({ "kind": "sentence" }),
+        )
+        .await;
+    server.guess(game_id, UNKNOWN_GUESS).await;
+    server.advance_clock(30.0);
+
+    let second_start = start_as(&server, &player_id).await;
+
+    assert_eq!(second_start["game_id"], game_id);
+    assert_eq!(second_start["remaining_seconds"], GAME_SECONDS - 30.0);
+    assert_eq!(
+        second_start["revealed_hints"],
+        json!([{ "kind": "sentence", "text": first_puzzle().sentence }])
+    );
+    assert_eq!(second_start["guesses"][0]["text"], UNKNOWN_GUESS);
+    assert_eq!(second_start["guesses"][0]["closeness"], 0);
+    assert_eq!(server.state.games.lock().unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn new_game_starts_with_nothing_revealed() {
+    let server = TestServer::with_word().await;
+    let started = server.start_game().await;
+    assert_eq!(started["revealed_hints"], json!([]));
+    assert_eq!(started["guesses"], json!([]));
+}
+
+#[tokio::test]
+async fn other_players_can_still_play() {
+    let server = TestServer::with_word().await;
+    let game_id = server.start_game_id().await;
+    server.finish(&game_id).await;
+
+    assert_eq!(
+        server
+            .start_game_with_token(VALID_TURNSTILE_TOKEN)
+            .await
+            .status,
+        StatusCode::OK
+    );
+}
+
+#[tokio::test]
+async fn player_can_play_again_when_a_new_word_is_published() {
+    let server = TestServer::with_word().await;
+    let player_id = new_player_id();
+    let game_id = start_as(&server, &player_id).await["game_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    server.finish(&game_id).await;
+
+    server.publish(&second_puzzle()).await;
+
+    assert_eq!(
+        start_as(&server, &player_id).await["word"],
+        second_puzzle().word.as_str()
+    );
+}
+
+#[tokio::test]
+async fn invalid_player_id_is_refused() {
+    let server = TestServer::with_word().await;
+    for player_id in ["", "kisa", "bosluk iceren bir kimlik 123", &"a".repeat(65)] {
+        let response = server.start_game_as(player_id, VALID_TURNSTILE_TOKEN).await;
+        assert_eq!(
+            response.status,
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "{player_id}"
+        );
+    }
+    assert!(server.turnstile.requests().is_empty());
+}
+
+#[tokio::test]
+async fn player_status_follows_the_game() {
+    let server = TestServer::with_word().await;
+    let player_id = new_player_id();
+    assert_eq!(server.player_today(&player_id).await.body["state"], "new");
+
+    let game_id = start_as(&server, &player_id).await["game_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let playing = server.player_today(&player_id).await.body;
+    assert_eq!(playing["state"], "playing");
+    assert_eq!(playing["result"], Value::Null);
+
+    server.guess(&game_id, &first_puzzle().definition).await;
+    let finished = server.player_today(&player_id).await.body;
+    assert_eq!(finished["state"], "finished");
+    assert_eq!(finished["result"]["won"], true);
+    assert_eq!(
+        finished["result"]["definition"],
+        first_puzzle().definition.as_str()
+    );
+}
+
+#[tokio::test]
+async fn result_is_kept_after_the_game_is_cleaned_up() {
+    let server = TestServer::with_word().await;
+    let player_id = new_player_id();
+    start_as(&server, &player_id).await;
+    server.advance_clock(GAME_SECONDS + GAME_RESULT_GRACE_SECONDS);
+
+    server.state.remove_expired_state();
+
+    assert!(server.state.games.lock().unwrap().is_empty());
+    let status = server.player_today(&player_id).await.body;
+    assert_eq!(status["state"], "finished");
+    assert_eq!(status["result"]["won"], false);
+    assert_eq!(status["result"]["seconds_used"], GAME_SECONDS as i64);
+}
+
+#[tokio::test]
+async fn player_status_without_a_word_is_not_found() {
+    let server = TestServer::empty().await;
+    assert_eq!(
+        server.player_today(&new_player_id()).await.status,
+        StatusCode::NOT_FOUND
+    );
 }

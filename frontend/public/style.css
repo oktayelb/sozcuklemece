@@ -176,6 +176,12 @@ p {
   margin-top: 1rem;
 }
 
+.played-note {
+  margin-top: 1rem;
+  color: var(--ink-soft);
+  font-style: italic;
+}
+
 .today-date {
   margin-top: 1.8rem;
   color: var(--ink-soft);

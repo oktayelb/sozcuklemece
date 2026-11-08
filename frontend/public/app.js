@@ -2,6 +2,7 @@ const LOW_TIME_SECONDS = 30;
 const TICK_MILLISECONDS = 200;
 const PENCIL_SOUND_FILES = ["sounds/pencil-1.mp3", "sounds/pencil-2.mp3", "sounds/pencil-3.mp3"];
 const PENCIL_SOUND_VOLUME = 0.7;
+const PLAYER_ID_STORAGE_KEY = "sozcuklemece-oyuncu";
 
 const game = {
   id: null,
@@ -18,12 +19,39 @@ const game = {
 
 let turnstileSiteKey = null;
 let turnstileAction = null;
+let todaysResult = null;
+
+const playerId = loadPlayerId();
 
 const pencilSounds = PENCIL_SOUND_FILES.map(loadSound);
 let nextPencilSound = 0;
 
 function element(id) {
   return document.getElementById(id);
+}
+
+function newPlayerId() {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function loadPlayerId() {
+  try {
+    const savedId = localStorage.getItem(PLAYER_ID_STORAGE_KEY);
+    if (savedId) {
+      return savedId;
+    }
+  } catch (error) {
+    console.debug("Oyuncu kimliği okunamadı:", error);
+  }
+  const id = newPlayerId();
+  try {
+    localStorage.setItem(PLAYER_ID_STORAGE_KEY, id);
+  } catch (error) {
+    console.debug("Oyuncu kimliği kaydedilemedi:", error);
+  }
+  return id;
 }
 
 function loadSound(file) {
@@ -62,6 +90,8 @@ function clearError() {
   element("error-banner").hidden = true;
 }
 
+class AlreadyPlayedError extends Error {}
+
 class RateLimitError extends Error {
   constructor(retryAfterSeconds) {
     super("İstek sınırı aşıldı.");
@@ -82,6 +112,9 @@ async function callApi(path, body) {
   }
   if (response.status === 403) {
     throw new HumanCheckError("İnsan doğrulaması geçilemedi.");
+  }
+  if (response.status === 409) {
+    throw new AlreadyPlayedError("Bugünün sözcüğü zaten oynandı.");
   }
   if (!response.ok) {
     throw new Error(`İstek başarısız oldu: ${response.status}`);
@@ -138,22 +171,62 @@ function formatClock(totalSeconds) {
   return `${minutes}:${seconds}`;
 }
 
+async function fetchPlayerToday() {
+  try {
+    return await callApi(`/api/players/${playerId}/today`);
+  } catch (error) {
+    return { state: "new", result: null };
+  }
+}
+
+function showPlayButton(playerToday) {
+  const playButton = element("play-button");
+  todaysResult = playerToday.result;
+  if (playerToday.state === "finished") {
+    playButton.textContent = "Sonucunu gör";
+  } else if (playerToday.state === "playing") {
+    playButton.textContent = "Devam et";
+  } else {
+    playButton.textContent = "Oyna";
+  }
+  element("played-note").hidden = playerToday.state !== "finished";
+  playButton.hidden = false;
+}
+
 async function loadLandingPage() {
   clearError();
   showScreen("landing-screen");
   element("play-button").hidden = true;
+  element("played-note").hidden = true;
   try {
     const today = await callApi("/api/today");
     element("today-date").textContent = formatDate(today.date);
     turnstileSiteKey = today.turnstile_site_key;
     turnstileAction = today.turnstile_action;
     if (today.word_available) {
-      element("play-button").hidden = false;
+      showPlayButton(await fetchPlayerToday());
     } else {
       showError("Bugünün sözcüğü henüz hazır değil. Biraz sonra tekrar dene.");
     }
   } catch (error) {
     showError("Sunucuya ulaşılamadı. Sayfayı yenileyip tekrar dene.");
+  }
+}
+
+async function showTodaysResult() {
+  const playerToday = await fetchPlayerToday();
+  if (playerToday.state === "finished") {
+    renderResult(playerToday.result);
+  } else {
+    showError("Sonucun alınamadı. Sayfayı yenileyip tekrar dene.");
+  }
+}
+
+function onPlayButton() {
+  if (todaysResult !== null) {
+    renderResult(todaysResult);
+  } else {
+    startGame();
   }
 }
 
@@ -197,7 +270,7 @@ function tick() {
   }
 }
 
-function buildHintSlot(hint) {
+function buildHintSlot(hint, revealedText) {
   const slot = document.createElement("div");
   slot.className = "hint-slot";
 
@@ -214,6 +287,9 @@ function buildHintSlot(hint) {
   button.append(label, cost);
   button.addEventListener("click", () => openHint(hint, slot));
   slot.append(button);
+  if (revealedText !== undefined) {
+    renderHintText(hint, slot, revealedText);
+  }
   return slot;
 }
 
@@ -311,7 +387,10 @@ async function startGame() {
   clearError();
   try {
     const turnstileToken = await requestHumanCheckToken();
-    const started = await callApi("/api/games", { turnstile_token: turnstileToken });
+    const started = await callApi("/api/games", {
+      turnstile_token: turnstileToken,
+      player_id: playerId,
+    });
 
     game.id = started.game_id;
     game.durationSeconds = started.duration_seconds;
@@ -323,9 +402,14 @@ async function startGame() {
 
     element("game-word").textContent = started.word;
     element("guess-list").replaceChildren();
+    for (const guess of started.guesses) {
+      addGuessToList(guess.text, guess.closeness, guess.label);
+    }
     element("guess-feedback").textContent = "";
     element("guess-input").value = "";
-    element("hint-list").replaceChildren(...started.hints.map(buildHintSlot));
+    const revealedTexts = new Map(started.revealed_hints.map((hint) => [hint.kind, hint.text]));
+    const hintSlots = started.hints.map((hint) => buildHintSlot(hint, revealedTexts.get(hint.kind)));
+    element("hint-list").replaceChildren(...hintSlots);
 
     showScreen("game-screen");
     element("guess-input").focus();
@@ -333,7 +417,11 @@ async function startGame() {
     renderGuessButton();
     game.timerId = setInterval(tick, TICK_MILLISECONDS);
   } catch (error) {
-    showError(requestFailureMessage(error, "Oyun başlatılamadı. Biraz sonra tekrar dene."));
+    if (error instanceof AlreadyPlayedError) {
+      await showTodaysResult();
+    } else {
+      showError(requestFailureMessage(error, "Oyun başlatılamadı. Biraz sonra tekrar dene."));
+    }
   } finally {
     game.isStarting = false;
   }
@@ -375,7 +463,7 @@ function renderResult(result) {
   showScreen("result-screen");
 }
 
-element("play-button").addEventListener("click", startGame);
+element("play-button").addEventListener("click", onPlayButton);
 element("guess-form").addEventListener("submit", submitGuess);
 element("home-button").addEventListener("click", loadLandingPage);
 

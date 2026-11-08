@@ -284,7 +284,11 @@ async fn word_without_wrong_meanings_can_be_judged() {
 async fn old_word_stays_for_a_running_game_then_leaves_memory() {
     let fixture = StoreFixture::new().await;
     fixture.store.publish(first_puzzle(), START).await.unwrap();
-    let game = Game::new(fixture.store.current_word(START).unwrap().word, START);
+    let game = Game::new(
+        fixture.store.current_word(START).unwrap().word,
+        "0123456789abcdef".to_string(),
+        START,
+    );
     let old_word = Arc::downgrade(&game.word);
     let mut games = std::collections::HashMap::new();
     games.insert(game.id.clone(), game);

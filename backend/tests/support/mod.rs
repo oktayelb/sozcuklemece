@@ -19,6 +19,7 @@ use serde_json::Value;
 use tempfile::TempDir;
 use tokio::net::TcpListener;
 use tower::ServiceExt;
+use uuid::Uuid;
 
 use sozcuklemece_backend::api::{AppState, router};
 use sozcuklemece_backend::clock::Clock;
@@ -36,6 +37,10 @@ pub const TURNSTILE_SITE_KEY: &str = "deneme-site-anahtari";
 pub const TURNSTILE_HOSTNAME: &str = "sozcuklemece.test";
 const TURNSTILE_SECRET_KEY: &str = "deneme-gizli-anahtar";
 const VECTOR_SIZE: usize = 1024;
+
+pub fn new_player_id() -> String {
+    Uuid::new_v4().simple().to_string()
+}
 
 pub fn load_sample_puzzles() -> Vec<Puzzle> {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tools/sample_puzzles.json");
@@ -384,9 +389,17 @@ impl TestServer {
             .await
     }
 
-    pub async fn start_game_with_token(&self, token: &str) -> ApiResponse {
-        let body = serde_json::json!({ "turnstile_token": token });
+    pub async fn start_game_as(&self, player_id: &str, token: &str) -> ApiResponse {
+        let body = serde_json::json!({ "turnstile_token": token, "player_id": player_id });
         self.post("/api/games", body).await
+    }
+
+    pub async fn start_game_with_token(&self, token: &str) -> ApiResponse {
+        self.start_game_as(&new_player_id(), token).await
+    }
+
+    pub async fn player_today(&self, player_id: &str) -> ApiResponse {
+        self.get(&format!("/api/players/{player_id}/today")).await
     }
 
     pub async fn start_game(&self) -> Value {
