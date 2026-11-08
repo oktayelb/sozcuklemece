@@ -319,70 +319,6 @@ impl FakeTurnstile {
     }
 }
 
-pub const CLAUDE_API_KEY: &str = "deneme-claude-anahtari";
-
-#[derive(Clone)]
-pub struct ClaudeRequest {
-    pub headers: HeaderMap,
-    pub body: Value,
-}
-
-struct FakeClaudeState {
-    requests: Mutex<Vec<ClaudeRequest>>,
-    answer: Mutex<Option<String>>,
-}
-
-async fn fake_messages(
-    State(state): State<Arc<FakeClaudeState>>,
-    headers: HeaderMap,
-    Json(body): Json<Value>,
-) -> Response {
-    state
-        .requests
-        .lock()
-        .unwrap()
-        .push(ClaudeRequest { headers, body });
-    let answer = state.answer.lock().unwrap().clone();
-    match answer {
-        Some(text) => Json(serde_json::json!({
-            "type": "message",
-            "role": "assistant",
-            "content": [{ "type": "text", "text": text }],
-            "stop_reason": "end_turn",
-        }))
-        .into_response(),
-        None => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
-    }
-}
-
-pub struct FakeClaude {
-    pub messages_url: String,
-    state: Arc<FakeClaudeState>,
-}
-
-impl FakeClaude {
-    pub async fn start(answer: Option<&str>) -> FakeClaude {
-        let state = Arc::new(FakeClaudeState {
-            requests: Mutex::new(Vec::new()),
-            answer: Mutex::new(answer.map(|text| text.to_string())),
-        });
-        let app = Router::new()
-            .route("/v1/messages", post(fake_messages))
-            .with_state(state.clone());
-        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let messages_url = format!("http://{}/v1/messages", listener.local_addr().unwrap());
-        tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
-        FakeClaude {
-            messages_url,
-            state,
-        }
-    }
-
-    pub fn requests(&self) -> Vec<ClaudeRequest> {
-        self.state.requests.lock().unwrap().clone()
-    }
-}
-
 pub struct TestServer {
     pub state: Arc<AppState>,
     pub tei: Arc<FakeTei>,
@@ -403,8 +339,6 @@ fn test_config(tei: &FakeTei, turnstile: &FakeTurnstile, word_file: PathBuf) -> 
         turnstile_secret_key: TURNSTILE_SECRET_KEY.to_string(),
         turnstile_hostname: TURNSTILE_HOSTNAME.to_string(),
         turnstile_verify_url: turnstile.verify_url.clone(),
-        anthropic_api_key: None,
-        anthropic_messages_url: "http://127.0.0.1:9/v1/messages".to_string(),
     }
 }
 

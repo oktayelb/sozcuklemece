@@ -13,8 +13,8 @@ use sozcuklemece_backend::rate_limit::{
 use sozcuklemece_backend::similarity::HIGHEST_WIN_SIMILARITY;
 use sozcuklemece_backend::text::normalize_text;
 use support::{
-    ADMIN_TOKEN, ApiResponse, CLAUDE_API_KEY, FAKE_TEI_MAX_WORDS, FakeClaude, FakeTeiMode,
-    FakeTurnstileMode, OTHER_ACTION_TURNSTILE_TOKEN, OTHER_SITE_TURNSTILE_TOKEN, PLAYER_IP,
+    ADMIN_TOKEN, ApiResponse, FAKE_TEI_MAX_WORDS, FakeTeiMode, FakeTurnstileMode,
+    OTHER_ACTION_TURNSTILE_TOKEN, OTHER_SITE_TURNSTILE_TOKEN, PLAYER_IP,
     TESTING_KEY_TURNSTILE_TOKEN, TURNSTILE_SITE_KEY, TestServer, VALID_TURNSTILE_TOKEN,
     entailing_guess, first_puzzle, game_day_noon, near_guess, new_player_id, second_puzzle,
 };
@@ -1252,61 +1252,6 @@ async fn published_test_guesses_survive_a_restart() {
         live.word.puzzle.right_test_guesses,
         puzzle.right_test_guesses
     );
-}
-
-#[tokio::test]
-async fn writing_test_guesses_needs_an_api_key() {
-    let server = TestServer::empty().await;
-    let response = server
-        .admin_post("/api/admin/word/test-guesses", &second_puzzle())
-        .await;
-    assert_eq!(response.status, StatusCode::SERVICE_UNAVAILABLE);
-}
-
-#[tokio::test]
-async fn test_guesses_are_written_by_claude() {
-    let claude = FakeClaude::start(Some(
-        r#"{"right":["sosu silen ekmek"],"wrong":["tencere kazıyıcı"]}"#,
-    ))
-    .await;
-    let messages_url = claude.messages_url.clone();
-    let server = TestServer::empty_with(move |config| {
-        config.anthropic_api_key = Some(CLAUDE_API_KEY.to_string());
-        config.anthropic_messages_url = messages_url.clone();
-    })
-    .await;
-
-    let response = server
-        .admin_post("/api/admin/word/test-guesses", &second_puzzle())
-        .await;
-
-    assert_eq!(response.status, StatusCode::OK, "{}", response.body);
-    assert_eq!(
-        response.body,
-        json!({ "right": ["sosu silen ekmek"], "wrong": ["tencere kazıyıcı"] })
-    );
-    let requests = claude.requests();
-    assert_eq!(requests.len(), 1);
-    assert_eq!(requests[0].headers["x-api-key"], CLAUDE_API_KEY);
-    assert_eq!(requests[0].headers["anthropic-version"], "2026-10-21");
-    assert_eq!(requests[0].body["model"], "claude-opus-5-5");
-    let prompt = requests[0].body["messages"][0]["content"].as_str().unwrap();
-    assert!(prompt.contains(&second_puzzle().definition));
-}
-
-#[tokio::test]
-async fn failed_writing_is_reported() {
-    let claude = FakeClaude::start(None).await;
-    let messages_url = claude.messages_url.clone();
-    let server = TestServer::empty_with(move |config| {
-        config.anthropic_api_key = Some(CLAUDE_API_KEY.to_string());
-        config.anthropic_messages_url = messages_url.clone();
-    })
-    .await;
-    let response = server
-        .admin_post("/api/admin/word/test-guesses", &second_puzzle())
-        .await;
-    assert_eq!(response.status, StatusCode::BAD_GATEWAY);
 }
 
 async fn admin_get(server: &TestServer, path: &str) -> ApiResponse {

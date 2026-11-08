@@ -143,16 +143,6 @@ async function runWithButton(buttonId, work) {
   }
 }
 
-function writeTestGuesses() {
-  return runWithButton("write-tests-button", async (message) => {
-    message.textContent = "Yazılıyor, bir dakika kadar sürebilir…";
-    const written = await callAdminApi("POST", "/api/admin/word/test-guesses", readWordForm());
-    addLines("right_test_guesses", written.right);
-    addLines("wrong_test_guesses", written.wrong);
-    message.textContent = `${written.right.length + written.wrong.length} deneme tahmini eklendi. Gözden geçirip Dene'ye bas.`;
-  });
-}
-
 function countWins(results, expected) {
   const matching = results.filter((result) => result.expected === expected);
   const wins = matching.filter((result) => result.won).length;
@@ -313,6 +303,5 @@ async function decideReview(text, verdict) {
 element("admin-token").addEventListener("change", refreshStatus);
 element("admin-token").addEventListener("change", refreshReview);
 element("review-refresh").addEventListener("click", refreshReview);
-element("write-tests-button").addEventListener("click", writeTestGuesses);
 element("check-button").addEventListener("click", checkWord);
 element("word-form").addEventListener("submit", publishWord);

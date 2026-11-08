@@ -11,6 +11,5 @@ pub mod rate_limit;
 pub mod review;
 pub mod similarity;
 pub mod stats;
-pub mod test_guess_writer;
 pub mod text;
 pub mod turnstile;
