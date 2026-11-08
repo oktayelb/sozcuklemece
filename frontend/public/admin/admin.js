@@ -27,12 +27,13 @@ function readWordForm() {
   return word;
 }
 
-function failureMessage(response) {
+async function failureMessage(response) {
   if (response.status === 401) {
     return "Parola yanlış.";
   }
   if (response.status === 422) {
-    return "Eksik ya da çok uzun bir alan var.";
+    const body = await response.json().catch(() => ({}));
+    return body.detail || "Eksik ya da çok uzun bir alan var.";
   }
   if (response.status === 429) {
     return `Çok fazla deneme yapıldı. ${response.headers.get("Retry-After")} saniye sonra tekrar dene.`;
@@ -61,7 +62,7 @@ async function callAdminApi(method, body) {
     throw new Error("Sunucuya ulaşılamadı.");
   }
   if (!response.ok) {
-    throw new Error(failureMessage(response));
+    throw new Error(await failureMessage(response));
   }
   return response.json();
 }

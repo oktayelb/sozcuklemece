@@ -10,7 +10,7 @@ use sozcuklemece_backend::rate_limit::{
     ADMIN_LIMIT, GUESS_LIMIT, GUESS_WINDOW_SECONDS, HINT_LIMIT, HINT_WINDOW_SECONDS, RESULT_LIMIT,
 };
 use support::{
-    ADMIN_TOKEN, FakeTeiMode, FakeTurnstileMode, OTHER_ACTION_TURNSTILE_TOKEN,
+    ADMIN_TOKEN, FAKE_TEI_MAX_WORDS, FakeTeiMode, FakeTurnstileMode, OTHER_ACTION_TURNSTILE_TOKEN,
     OTHER_SITE_TURNSTILE_TOKEN, PLAYER_IP, TESTING_KEY_TURNSTILE_TOKEN, TURNSTILE_SITE_KEY,
     TestServer, VALID_TURNSTILE_TOKEN, first_puzzle, game_day_noon, new_player_id, second_puzzle,
 };
@@ -1103,4 +1103,37 @@ async fn game_of_a_replaced_word_has_no_stats() {
 
     assert_eq!(result["stats"], Value::Null);
     assert_eq!(result["word"], first_puzzle().word.as_str());
+}
+
+fn words(count: usize) -> String {
+    vec!["söz"; count].join(" ")
+}
+
+#[tokio::test]
+async fn guess_longer_than_the_model_reads_is_refused_with_a_reason() {
+    let server = TestServer::with_word().await;
+    let game_id = server.start_game_id().await;
+
+    let response = server.guess(&game_id, &words(FAKE_TEI_MAX_WORDS + 1)).await;
+
+    assert_eq!(response.status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert!(response.body["detail"].as_str().unwrap().contains("uzun"));
+    assert_eq!(server.finish(&game_id).await.body["guess_count"], 0);
+}
+
+#[tokio::test]
+async fn definition_longer_than_the_model_reads_is_refused() {
+    let server = TestServer::with_word().await;
+    let long_definition = puzzle_json_with(json!({ "definition": words(FAKE_TEI_MAX_WORDS + 1) }));
+
+    let response = server
+        .publish_with_token(&long_definition, Some(ADMIN_TOKEN))
+        .await;
+
+    assert_eq!(response.status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert!(response.body["detail"].as_str().unwrap().contains("uzun"));
+    assert_eq!(
+        server.start_game().await["word"],
+        first_puzzle().word.as_str()
+    );
 }

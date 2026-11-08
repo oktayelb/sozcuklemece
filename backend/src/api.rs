@@ -106,6 +106,9 @@ impl From<EncoderError> for ApiError {
     fn from(error: EncoderError) -> ApiError {
         match error {
             EncoderError::Overloaded => ApiError::ModelBusy,
+            EncoderError::TooLong => {
+                ApiError::InvalidInput("Tahminin çok uzun, biraz kısaltıp tekrar dene.".to_string())
+            }
             EncoderError::Failed(_) => {
                 eprintln!("Tahmin değerlendirilemedi: {error}");
                 ApiError::ServerFailed
@@ -383,11 +386,17 @@ async fn publish_word(
             )));
         }
     };
-    state
+    let published = state
         .word_store
         .publish(puzzle, state.clock.unix_seconds())
-        .await?;
-    Ok(Json(word_status(&state)))
+        .await;
+    match published {
+        Ok(()) => Ok(Json(word_status(&state))),
+        Err(StoreError::Encoder(EncoderError::TooLong)) => Err(ApiError::InvalidInput(
+            "Tanımlardan biri modelin okuyabileceğinden uzun. Kısaltıp tekrar dene.".to_string(),
+        )),
+        Err(error) => Err(ApiError::from(error)),
+    }
 }
 
 fn start_response(game: &Game, now: f64) -> StartResponse {

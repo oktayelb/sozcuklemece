@@ -79,6 +79,8 @@ Doğruluğu örnek sözcüklerle ölçmek için TEI açıkken `backend` klasör�
 
 Model derlenirken `ai/quantize.py` ile int8'e indirilir. Ağırlık çarpımları `ai/calibration_texts.txt` içindeki örnek tanımlarla önceden ölçeklenir (statik nicemleme). Ölçekler sabit olduğu için bir tahminin skoru aynı anda işlenen diğer tahminlere bağlı değildir. Dinamik nicemleme daha basittir ama TEI istekleri toplu işlediği için skorlar yüke göre oynuyordu. Model ya da nicemleme değişirse kazanma eşiği `evaluate_guesses` ile yeniden ayarlanmalı.
 
+Model en çok 75 parça (token) okur. Arka uç TEI'ye metni kesmemesini söyler: daha uzun bir tahmin sessizce kırpılmak yerine oyuncuya "çok uzun" diye geri döner, daha uzun bir tanım da yönetim sayfasında reddedilir. Olağan Türkçe metinde 200 karakter yaklaşık 40 parça eder.
+
 Oyun ayarları: kazanma eşiği ve önbellek boyutu `backend/src/similarity.rs`, süre ve puan `backend/src/game.rs`, sözcüğün ömrü `backend/src/daily_word.rs`, istek sınırları `backend/src/rate_limit.rs`.
 
 ## İstek sınırı

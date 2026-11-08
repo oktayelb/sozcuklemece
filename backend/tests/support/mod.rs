@@ -80,9 +80,29 @@ struct FakeTeiState {
     mode: Mutex<FakeTeiMode>,
 }
 
+pub const FAKE_TEI_MAX_WORDS: usize = 75;
+
 #[derive(Deserialize)]
 struct EmbedRequest {
     inputs: Vec<String>,
+    truncate: Option<bool>,
+}
+
+fn too_long_answer(request: &EmbedRequest) -> Option<Response> {
+    if request.truncate != Some(false) {
+        return None;
+    }
+    for text in &request.inputs {
+        let word_count = text.split_whitespace().count();
+        if word_count > FAKE_TEI_MAX_WORDS {
+            let body = serde_json::json!({
+                "error": format!("Input validation error: `inputs` must have less than {FAKE_TEI_MAX_WORDS} tokens. Given: {word_count}"),
+                "error_type": "Validation",
+            });
+            return Some((StatusCode::UNPROCESSABLE_ENTITY, Json(body)).into_response());
+        }
+    }
+    None
 }
 
 async fn fake_embed(
@@ -93,6 +113,9 @@ async fn fake_embed(
         FakeTeiMode::Broken => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
         FakeTeiMode::Overloaded => return StatusCode::TOO_MANY_REQUESTS.into_response(),
         FakeTeiMode::Working => {}
+    }
+    if let Some(answer) = too_long_answer(&request) {
+        return answer;
     }
     let mut memory = state.memory.lock().unwrap();
     let mut vectors = Vec::new();

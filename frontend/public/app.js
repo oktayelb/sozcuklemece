@@ -95,6 +95,8 @@ function clearError() {
 
 class AlreadyPlayedError extends Error {}
 
+class RefusedInputError extends Error {}
+
 class RateLimitError extends Error {
   constructor(retryAfterSeconds) {
     super("İstek sınırı aşıldı.");
@@ -118,6 +120,10 @@ async function callApi(path, body) {
   }
   if (response.status === 409) {
     throw new AlreadyPlayedError("Bugünün sözcüğü zaten oynandı.");
+  }
+  if (response.status === 422) {
+    const body = await response.json().catch(() => ({}));
+    throw new RefusedInputError(body.detail || "Gönderilen metin kabul edilmedi.");
   }
   if (!response.ok) {
     throw new Error(`İstek başarısız oldu: ${response.status}`);
@@ -158,6 +164,9 @@ function requestFailureMessage(error, fallbackMessage) {
   }
   if (error instanceof RateLimitError) {
     return `Çok fazla istek gönderildi. ${error.retryAfterSeconds} saniye sonra tekrar dene.`;
+  }
+  if (error instanceof RefusedInputError) {
+    return error.message;
   }
   return fallbackMessage;
 }

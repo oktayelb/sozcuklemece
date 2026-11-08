@@ -10,6 +10,8 @@ use tokio::signal::unix::{SignalKind, signal};
 use sozcuklemece_backend::api::{AppState, router};
 use sozcuklemece_backend::clock::Clock;
 use sozcuklemece_backend::config::Config;
+use sozcuklemece_backend::daily_word::StoreError;
+use sozcuklemece_backend::encoder::EncoderError;
 
 const CLEANUP_INTERVAL: Duration = Duration::from_secs(60);
 const HEALTH_CHECK_TIMEOUT: Duration = Duration::from_secs(2);
@@ -51,13 +53,19 @@ async fn main() {
     }
     let state = Arc::new(AppState::new(config, Clock::system()));
 
-    if let Err(error) = state
+    let loaded = state
         .word_store
         .load_saved_word(state.clock.unix_seconds())
-        .await
-    {
-        eprintln!("Kayıtlı sözcük yüklenemedi: {error}");
-        process::exit(1);
+        .await;
+    match loaded {
+        Ok(()) => {}
+        Err(StoreError::Encoder(EncoderError::TooLong)) => {
+            eprintln!("Kayıtlı sözcüğün bir tanımı modelin sınırından uzun, sözcük yüklenmedi.");
+        }
+        Err(error) => {
+            eprintln!("Kayıtlı sözcük yüklenemedi: {error}");
+            process::exit(1);
+        }
     }
     tokio::spawn(clean_up_periodically(state.clone()));
 
