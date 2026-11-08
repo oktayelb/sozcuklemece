@@ -29,7 +29,11 @@ pub const ADMIN_TOKEN: &str = "deneme-parolasi";
 pub const CLIENT_IP_HEADER: &str = "x-real-ip";
 pub const PLAYER_IP: &str = "203.0.113.5";
 pub const VALID_TURNSTILE_TOKEN: &str = "gecerli-jeton";
+pub const OTHER_SITE_TURNSTILE_TOKEN: &str = "baska-sitenin-jetonu";
+pub const OTHER_ACTION_TURNSTILE_TOKEN: &str = "baska-eylemin-jetonu";
+pub const TESTING_KEY_TURNSTILE_TOKEN: &str = "XXXX.DUMMY.TOKEN.XXXX";
 pub const TURNSTILE_SITE_KEY: &str = "deneme-site-anahtari";
+pub const TURNSTILE_HOSTNAME: &str = "sozcuklemece.test";
 const TURNSTILE_SECRET_KEY: &str = "deneme-gizli-anahtar";
 const VECTOR_SIZE: usize = 1024;
 
@@ -155,10 +159,38 @@ async fn fake_siteverify(
     if *state.mode.lock().unwrap() == FakeTurnstileMode::Down {
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
-    let success =
-        request.secret == TURNSTILE_SECRET_KEY && request.response == VALID_TURNSTILE_TOKEN;
+    let answer = siteverify_answer(&request);
     state.requests.lock().unwrap().push(request);
-    Json(serde_json::json!({ "success": success })).into_response()
+    Json(answer).into_response()
+}
+
+fn siteverify_answer(request: &SiteverifyRequest) -> Value {
+    if request.secret != TURNSTILE_SECRET_KEY {
+        return serde_json::json!({ "success": false });
+    }
+    match request.response.as_str() {
+        VALID_TURNSTILE_TOKEN => serde_json::json!({
+            "success": true,
+            "hostname": TURNSTILE_HOSTNAME,
+            "action": "start_game",
+        }),
+        OTHER_SITE_TURNSTILE_TOKEN => serde_json::json!({
+            "success": true,
+            "hostname": "baska-site.example",
+            "action": "start_game",
+        }),
+        OTHER_ACTION_TURNSTILE_TOKEN => serde_json::json!({
+            "success": true,
+            "hostname": TURNSTILE_HOSTNAME,
+            "action": "login",
+        }),
+        TESTING_KEY_TURNSTILE_TOKEN => serde_json::json!({
+            "success": true,
+            "hostname": "example.com",
+            "metadata": { "result_with_testing_key": true },
+        }),
+        _ => serde_json::json!({ "success": false }),
+    }
 }
 
 pub struct FakeTurnstile {
@@ -207,6 +239,7 @@ fn test_config(tei: &FakeTei, turnstile: &FakeTurnstile, word_file: PathBuf) -> 
         client_ip_header: Some(axum::http::HeaderName::from_static(CLIENT_IP_HEADER)),
         turnstile_site_key: TURNSTILE_SITE_KEY.to_string(),
         turnstile_secret_key: TURNSTILE_SECRET_KEY.to_string(),
+        turnstile_hostname: TURNSTILE_HOSTNAME.to_string(),
         turnstile_verify_url: turnstile.verify_url.clone(),
     }
 }

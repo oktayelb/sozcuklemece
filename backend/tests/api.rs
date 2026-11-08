@@ -8,8 +8,9 @@ use sozcuklemece_backend::daily_word::WORD_TTL_SECONDS;
 use sozcuklemece_backend::game::{GAME_RESULT_GRACE_SECONDS, GAME_SECONDS, GUESS_INTERVAL_SECONDS};
 use sozcuklemece_backend::rate_limit::{ADMIN_LIMIT, GUESS_LIMIT, GUESS_WINDOW_SECONDS};
 use support::{
-    ADMIN_TOKEN, FakeTeiMode, FakeTurnstileMode, PLAYER_IP, TURNSTILE_SITE_KEY, TestServer,
-    VALID_TURNSTILE_TOKEN, first_puzzle, game_day_noon, second_puzzle,
+    ADMIN_TOKEN, FakeTeiMode, FakeTurnstileMode, OTHER_ACTION_TURNSTILE_TOKEN,
+    OTHER_SITE_TURNSTILE_TOKEN, PLAYER_IP, TESTING_KEY_TURNSTILE_TOKEN, TURNSTILE_SITE_KEY,
+    TestServer, VALID_TURNSTILE_TOKEN, first_puzzle, game_day_noon, second_puzzle,
 };
 
 const UNKNOWN_GUESS: &str = "bambaşka bir açıklama";
@@ -39,6 +40,7 @@ async fn today_reports_date_and_a_ready_word() {
             "date": "2026-11-06",
             "word_available": true,
             "turnstile_site_key": TURNSTILE_SITE_KEY,
+            "turnstile_action": "start_game",
         })
     );
 }
@@ -728,6 +730,34 @@ async fn start_with_a_failed_human_check_is_forbidden() {
         assert_eq!(response.status, StatusCode::FORBIDDEN, "{token}");
     }
     assert!(server.state.games.lock().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn token_from_another_site_is_forbidden() {
+    let server = TestServer::with_word().await;
+    let response = server
+        .start_game_with_token(OTHER_SITE_TURNSTILE_TOKEN)
+        .await;
+    assert_eq!(response.status, StatusCode::FORBIDDEN);
+    assert!(server.state.games.lock().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn token_for_another_action_is_forbidden() {
+    let server = TestServer::with_word().await;
+    let response = server
+        .start_game_with_token(OTHER_ACTION_TURNSTILE_TOKEN)
+        .await;
+    assert_eq!(response.status, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn token_from_cloudflare_test_keys_passes() {
+    let server = TestServer::with_word().await;
+    let response = server
+        .start_game_with_token(TESTING_KEY_TURNSTILE_TOKEN)
+        .await;
+    assert_eq!(response.status, StatusCode::OK);
 }
 
 #[tokio::test]

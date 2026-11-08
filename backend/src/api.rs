@@ -26,7 +26,7 @@ use crate::rate_limit::{
     GUESS_WINDOW_SECONDS, RateLimiter, UNKNOWN_CLIENT, rate_limit_key,
 };
 use crate::similarity::MeaningJudge;
-use crate::turnstile::{HumanCheck, TurnstileVerifier};
+use crate::turnstile::{HumanCheck, START_GAME_ACTION, TurnstileVerifier};
 
 pub const ADMIN_TOKEN_HEADER: &str = "x-admin-token";
 
@@ -49,6 +49,7 @@ impl AppState {
         let turnstile = TurnstileVerifier::new(
             config.turnstile_secret_key.clone(),
             config.turnstile_verify_url.clone(),
+            config.turnstile_hostname.clone(),
         );
         AppState {
             config,
@@ -252,6 +253,7 @@ struct TodayResponse {
     date: String,
     word_available: bool,
     turnstile_site_key: String,
+    turnstile_action: &'static str,
 }
 
 #[derive(Serialize)]
@@ -312,6 +314,7 @@ async fn get_today(State(state): State<Arc<AppState>>) -> Json<TodayResponse> {
         date: game_day(now).to_string(),
         word_available: state.word_store.current_word(now).is_some(),
         turnstile_site_key: state.config.turnstile_site_key.clone(),
+        turnstile_action: START_GAME_ACTION,
     })
 }
 

@@ -17,6 +17,7 @@ const game = {
 };
 
 let turnstileSiteKey = null;
+let turnstileAction = null;
 
 const pencilSounds = PENCIL_SOUND_FILES.map(loadSound);
 let nextPencilSound = 0;
@@ -105,6 +106,7 @@ function requestHumanCheckToken() {
     };
     widgetId = turnstile.render("#human-check", {
       sitekey: turnstileSiteKey,
+      action: turnstileAction,
       appearance: "interaction-only",
       language: "tr",
       callback: (token) => finish(() => resolve(token)),
@@ -144,6 +146,7 @@ async function loadLandingPage() {
     const today = await callApi("/api/today");
     element("today-date").textContent = formatDate(today.date);
     turnstileSiteKey = today.turnstile_site_key;
+    turnstileAction = today.turnstile_action;
     if (today.word_available) {
       element("play-button").hidden = false;
     } else {

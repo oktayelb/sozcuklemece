@@ -52,7 +52,7 @@ Testler: `cd backend && cargo test`
 
 Oyun başlatılırken Cloudflare Turnstile ile doğrulama yapılır. Görünmez çalışır, oyuncuya kutucuk yalnızca Cloudflare şüphelenirse gösterilir. Turnstile jetonu tek kullanımlık ve her doğrulama Cloudflare'e bir istek olduğu için doğrulama her tahminde değil oyun başında yapılır. Sonraki istekler tahmin edilemeyen oyun kimliğine ve oyun başı bekleme süresine bağlıdır.
 
-`TURNSTILE_SITE_KEY` ve `TURNSTILE_SECRET_KEY` zorunludur ve Cloudflare panelinden alınır. `.env.example` içindekiler Cloudflare'in her zaman geçen test anahtarlarıdır, yalnızca yerelde kullan. Cloudflare'e ulaşılamazsa oyun başlatılamaz (503).
+`TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` ve `TURNSTILE_HOSTNAME` zorunludur. Anahtarlar Cloudflare panelinden alınır, `TURNSTILE_HOSTNAME` sitenin alan adıdır (ör. `sozcuklemece.com`). Arka uç jetonun bu alan adında ve `start_game` eylemi için alındığını da denetler. `.env.example` içindekiler Cloudflare'in her zaman geçen test anahtarlarıdır, yalnızca yerelde kullan. Test anahtarlarında alan adı ve eylem denetlenmez. Cloudflare'e ulaşılamazsa oyun başlatılamaz (503).
 
 ## Önbellek ve CDN
 

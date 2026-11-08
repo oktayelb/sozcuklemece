@@ -18,6 +18,7 @@ pub struct Config {
     pub client_ip_header: Option<HeaderName>,
     pub turnstile_site_key: String,
     pub turnstile_secret_key: String,
+    pub turnstile_hostname: String,
     pub turnstile_verify_url: String,
 }
 
@@ -54,6 +55,7 @@ impl Config {
             client_ip_header,
             turnstile_site_key: required_variable("TURNSTILE_SITE_KEY"),
             turnstile_secret_key: required_variable("TURNSTILE_SECRET_KEY"),
+            turnstile_hostname: required_variable("TURNSTILE_HOSTNAME"),
             turnstile_verify_url: SITEVERIFY_URL.to_string(),
         }
     }

@@ -3,6 +3,7 @@ use std::time::Duration;
 use serde::Deserialize;
 
 pub const SITEVERIFY_URL: &str = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
+pub const START_GAME_ACTION: &str = "start_game";
 const MAX_TOKEN_LENGTH: usize = 2048;
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
 
@@ -13,19 +14,36 @@ pub enum HumanCheck {
     Unavailable,
 }
 
+#[derive(Deserialize, Default)]
+struct SiteverifyMetadata {
+    #[serde(default)]
+    result_with_testing_key: bool,
+}
+
 #[derive(Deserialize)]
 struct SiteverifyResponse {
     success: bool,
+    #[serde(default)]
+    hostname: String,
+    #[serde(default)]
+    action: String,
+    #[serde(default)]
+    metadata: SiteverifyMetadata,
 }
 
 pub struct TurnstileVerifier {
     http: reqwest::Client,
     secret_key: String,
     verify_url: String,
+    expected_hostname: String,
 }
 
 impl TurnstileVerifier {
-    pub fn new(secret_key: String, verify_url: String) -> TurnstileVerifier {
+    pub fn new(
+        secret_key: String,
+        verify_url: String,
+        expected_hostname: String,
+    ) -> TurnstileVerifier {
         let http = reqwest::Client::builder()
             .timeout(REQUEST_TIMEOUT)
             .build()
@@ -34,7 +52,32 @@ impl TurnstileVerifier {
             http,
             secret_key,
             verify_url,
+            expected_hostname,
         }
+    }
+
+    fn judge_answer(&self, answer: &SiteverifyResponse) -> HumanCheck {
+        if !answer.success {
+            return HumanCheck::Failed;
+        }
+        if answer.metadata.result_with_testing_key {
+            return HumanCheck::Passed;
+        }
+        if answer.hostname != self.expected_hostname {
+            eprintln!(
+                "Turnstile jetonu başka bir alan adından geldi: {}",
+                answer.hostname
+            );
+            return HumanCheck::Failed;
+        }
+        if answer.action != START_GAME_ACTION {
+            eprintln!(
+                "Turnstile jetonu başka bir eylem için alınmış: {}",
+                answer.action
+            );
+            return HumanCheck::Failed;
+        }
+        HumanCheck::Passed
     }
 
     pub async fn verify(&self, token: &str, client_ip: Option<&str>) -> HumanCheck {
@@ -60,8 +103,7 @@ impl TurnstileVerifier {
         }
 
         match response.json::<SiteverifyResponse>().await {
-            Ok(body) if body.success => HumanCheck::Passed,
-            Ok(_) => HumanCheck::Failed,
+            Ok(answer) => self.judge_answer(&answer),
             Err(error) => {
                 eprintln!("Turnstile yanıtı okunamadı: {error}");
                 HumanCheck::Unavailable

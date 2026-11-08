@@ -16,6 +16,7 @@ services:
       ADMIN_TOKEN: ${ADMIN_TOKEN:?.env dosyasında ADMIN_TOKEN ayarlanmalı}
       TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:?.env dosyasında TURNSTILE_SITE_KEY ayarlanmalı}
       TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:?.env dosyasında TURNSTILE_SECRET_KEY ayarlanmalı}
+      TURNSTILE_HOSTNAME: ${TURNSTILE_HOSTNAME:?.env dosyasında TURNSTILE_HOSTNAME ayarlanmalı}
       TEI_URL: http://ai:80
       CLIENT_IP_HEADER: X-Real-IP
     volumes:
