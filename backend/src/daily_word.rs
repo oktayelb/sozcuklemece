@@ -139,6 +139,7 @@ impl DailyWordStore {
             word: Arc::new(word),
             expires_at,
         });
+        self.judge.forget_guesses();
         Ok(())
     }
 
@@ -151,6 +152,7 @@ impl DailyWordStore {
         if has_expired {
             *live = None;
             delete_word_file(&self.word_file);
+            self.judge.forget_guesses();
         }
     }
 

@@ -54,13 +54,14 @@ nginx ön yüz dosyalarını önbellek başlıklarıyla sunar: HTML, JS ve CSS 5
 - Yeni sözcük hemen oyuna girer, önceki sözcük bellekten ve diskten silinir. O sırada süren oyunlar kendi sözcükleriyle biter.
 - Sözcük yüklendikten 24 saat sonra kendiliğinden silinir. Yenisi yüklenene kadar oyun başlatılamaz.
 - Sunucu yeniden başlarsa sözcük `WORD_FILE` dosyasından okunup yeniden hazırlanır. Bu dosya depoya girmez.
+- Tahminlerin vektörleri en çok 1000 tahminlik bir önbellekte tutulur, az kullanılanlar yenilerine yer açar. Aynı anda gelen aynı tahmin modele bir kez gider. Sözcük değişince ya da süresi dolunca önbellek boşaltılır.
 
 Doğruluğu örnek sözcüklerle ölçmek için TEI açıkken `backend` klasöründe:
 
     cargo run --release --bin evaluate_guesses
     cargo test -- --ignored
 
-Oyun ayarları: kazanma eşiği `backend/src/similarity.rs`, süre ve puan `backend/src/game.rs`, sözcüğün ömrü `backend/src/daily_word.rs`, istek sınırları `backend/src/rate_limit.rs`.
+Oyun ayarları: kazanma eşiği ve önbellek boyutu `backend/src/similarity.rs`, süre ve puan `backend/src/game.rs`, sözcüğün ömrü `backend/src/daily_word.rs`, istek sınırları `backend/src/rate_limit.rs`.
 
 ## İstek sınırı
 

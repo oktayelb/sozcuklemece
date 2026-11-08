@@ -1,3 +1,7 @@
+use std::sync::Arc;
+
+use moka::future::Cache;
+
 use crate::encoder::{EncoderError, TeiEncoder};
 use crate::puzzle::Puzzle;
 use crate::text::normalize_text;
@@ -5,6 +9,7 @@ use crate::text::normalize_text;
 pub const WIN_SIMILARITY: f64 = 0.625;
 pub const ZERO_CLOSENESS_SIMILARITY: f64 = 0.15;
 pub const HIGHEST_CLOSENESS_WITHOUT_WIN: i64 = 99;
+pub const GUESS_CACHE_SIZE: u64 = 1000;
 
 pub fn closeness_percent(similarity: f64) -> i64 {
     let similarity_range = WIN_SIMILARITY - ZERO_CLOSENESS_SIMILARITY;
@@ -61,11 +66,15 @@ fn closest_similarity(vectors: &[Vec<f32>], guess_vector: &[f32]) -> f64 {
 
 pub struct MeaningJudge {
     encoder: TeiEncoder,
+    guess_vectors: Cache<String, Arc<Vec<f32>>>,
 }
 
 impl MeaningJudge {
     pub fn new(encoder: TeiEncoder) -> MeaningJudge {
-        MeaningJudge { encoder }
+        MeaningJudge {
+            encoder,
+            guess_vectors: Cache::new(GUESS_CACHE_SIZE),
+        }
     }
 
     async fn encode_all(&self, texts: &[String]) -> Result<Vec<Vec<f32>>, EncoderError> {
@@ -76,9 +85,28 @@ impl MeaningJudge {
         self.encoder.encode(&normalized_texts).await
     }
 
-    async fn encode_guess(&self, normalized_guess: String) -> Result<Vec<f32>, EncoderError> {
+    async fn encode_guess_without_cache(
+        &self,
+        normalized_guess: String,
+    ) -> Result<Arc<Vec<f32>>, EncoderError> {
         let mut vectors = self.encoder.encode(&[normalized_guess]).await?;
-        Ok(vectors.remove(0))
+        Ok(Arc::new(vectors.remove(0)))
+    }
+
+    async fn encode_guess(&self, normalized_guess: String) -> Result<Arc<Vec<f32>>, EncoderError> {
+        let encoding = self.encode_guess_without_cache(normalized_guess.clone());
+        match self
+            .guess_vectors
+            .try_get_with(normalized_guess, encoding)
+            .await
+        {
+            Ok(vector) => Ok(vector),
+            Err(shared_error) => Err(shared_error.as_ref().clone()),
+        }
+    }
+
+    pub fn forget_guesses(&self) {
+        self.guess_vectors.invalidate_all();
     }
 
     pub async fn prepare(&self, puzzle: Puzzle) -> Result<PreparedWord, EncoderError> {

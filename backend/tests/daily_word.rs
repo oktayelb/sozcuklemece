@@ -326,3 +326,96 @@ fn new_day_starts_at_midnight_in_turkey() {
         NaiveDate::from_ymd_opt(2026, 11, 7).unwrap()
     );
 }
+
+fn times_encoded(tei: &FakeTei, normalized_text: &str) -> usize {
+    let encoded_texts = tei.encoded_texts();
+    encoded_texts
+        .iter()
+        .filter(|text| *text == normalized_text)
+        .count()
+}
+
+#[tokio::test]
+async fn repeated_guess_is_encoded_once() {
+    let fixture = StoreFixture::new().await;
+    fixture.store.publish(first_puzzle(), START).await.unwrap();
+    let word = fixture.store.current_word(START).unwrap().word;
+
+    fixture
+        .judge
+        .similarity(&word, "aynı tahmin")
+        .await
+        .unwrap();
+    fixture
+        .judge
+        .similarity(&word, "AYNI tahmin!")
+        .await
+        .unwrap();
+
+    assert_eq!(times_encoded(&fixture.tei, "aynı tahmin"), 1);
+}
+
+#[tokio::test]
+async fn same_guess_sent_at_the_same_moment_is_encoded_once() {
+    let fixture = StoreFixture::new().await;
+    fixture.store.publish(first_puzzle(), START).await.unwrap();
+    let word = fixture.store.current_word(START).unwrap().word;
+
+    let (first, second, third) = tokio::join!(
+        fixture.judge.similarity(&word, "aynı anda gelen tahmin"),
+        fixture.judge.similarity(&word, "aynı anda gelen tahmin"),
+        fixture.judge.similarity(&word, "aynı anda gelen tahmin"),
+    );
+
+    assert_eq!(first.unwrap(), second.unwrap());
+    assert!(third.is_ok());
+    assert_eq!(times_encoded(&fixture.tei, "aynı anda gelen tahmin"), 1);
+}
+
+#[tokio::test]
+async fn publishing_forgets_cached_guesses() {
+    let fixture = StoreFixture::new().await;
+    fixture.store.publish(first_puzzle(), START).await.unwrap();
+    let old_word = fixture.store.current_word(START).unwrap().word;
+    fixture
+        .judge
+        .similarity(&old_word, "eski sözcük için tahmin")
+        .await
+        .unwrap();
+
+    fixture.store.publish(second_puzzle(), START).await.unwrap();
+    let new_word = fixture.store.current_word(START).unwrap().word;
+    fixture
+        .judge
+        .similarity(&new_word, "eski sözcük için tahmin")
+        .await
+        .unwrap();
+
+    assert_eq!(times_encoded(&fixture.tei, "eski sözcük için tahmin"), 2);
+}
+
+#[tokio::test]
+async fn expiry_forgets_cached_guesses() {
+    let fixture = StoreFixture::new().await;
+    fixture.store.publish(first_puzzle(), START).await.unwrap();
+    let word = fixture.store.current_word(START).unwrap().word;
+    fixture.judge.similarity(&word, "bir tahmin").await.unwrap();
+
+    fixture.store.drop_expired_word(START + WORD_TTL_SECONDS);
+    fixture.judge.similarity(&word, "bir tahmin").await.unwrap();
+
+    assert_eq!(times_encoded(&fixture.tei, "bir tahmin"), 2);
+}
+
+#[tokio::test]
+async fn failed_encoding_is_not_cached() {
+    let fixture = StoreFixture::new().await;
+    fixture.store.publish(first_puzzle(), START).await.unwrap();
+    let word = fixture.store.current_word(START).unwrap().word;
+    fixture.tei.set_mode(FakeTeiMode::Overloaded);
+    assert!(fixture.judge.similarity(&word, "bir tahmin").await.is_err());
+
+    fixture.tei.set_mode(FakeTeiMode::Working);
+
+    assert!(fixture.judge.similarity(&word, "bir tahmin").await.is_ok());
+}
