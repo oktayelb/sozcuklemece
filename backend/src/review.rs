@@ -2,6 +2,8 @@ use std::collections::HashMap;
 
 use serde::Serialize;
 
+use crate::game::WIN_CLOSENESS;
+
 pub const CLOSE_CALL_CLOSENESS: i64 = 70;
 pub const MAX_REVIEW_ITEMS: usize = 300;
 
@@ -11,6 +13,7 @@ pub struct ReviewItem {
     pub closeness: i64,
     pub appeals: u32,
     pub seen: u32,
+    pub won_by_entailment: bool,
 }
 
 pub struct ReviewQueue {
@@ -50,6 +53,7 @@ impl ReviewQueue {
                 closeness,
                 appeals: 0,
                 seen: 0,
+                won_by_entailment: false,
             };
             self.items.insert(key.to_string(), item);
         }
@@ -64,6 +68,15 @@ impl ReviewQueue {
         if let Some(item) = self.item_for(key, text, closeness) {
             item.seen += 1;
             item.closeness = item.closeness.max(closeness);
+        }
+    }
+
+    pub fn record_entailment_win(&mut self, edition: &str, key: &str, text: &str) {
+        self.follow(edition);
+        if let Some(item) = self.item_for(key, text, WIN_CLOSENESS) {
+            item.seen += 1;
+            item.closeness = WIN_CLOSENESS;
+            item.won_by_entailment = true;
         }
     }
 
@@ -148,6 +161,15 @@ mod tests {
             queue.record_appeal(EDITION, &text, &text, 60);
         }
         assert_eq!(queue.items(EDITION).len(), MAX_REVIEW_ITEMS);
+    }
+
+    #[test]
+    fn entailment_win_is_listed_as_a_win() {
+        let mut queue = ReviewQueue::new();
+        queue.record_entailment_win(EDITION, "a", "a");
+        let items = queue.items(EDITION);
+        assert!(items[0].won_by_entailment);
+        assert_eq!(items[0].closeness, WIN_CLOSENESS);
     }
 
     #[test]

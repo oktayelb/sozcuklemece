@@ -4,6 +4,7 @@ use moka::future::Cache;
 use uuid::Uuid;
 
 use crate::encoder::{EncoderError, TeiEncoder};
+use crate::entailment::EntailmentChecker;
 use crate::puzzle::Puzzle;
 use crate::text::{LetterRestorer, normalize_text};
 
@@ -14,6 +15,8 @@ pub const GUESS_CACHE_SIZE: u64 = 1000;
 pub const WRONG_TURN_FLOOR: f64 = 0.4;
 pub const TEST_GUESS_MARGIN: f64 = 0.02;
 pub const HIGHEST_WIN_SIMILARITY: f64 = 0.70;
+pub const ENTAILMENT_BAND_FLOOR: f64 = 0.40;
+pub const ENTAILMENT_TO_WIN: f64 = 0.90;
 
 pub fn closeness_percent(similarity: f64, win_similarity: f64) -> i64 {
     let similarity_range = win_similarity - ZERO_CLOSENESS_SIMILARITY;
@@ -32,6 +35,7 @@ pub enum WrongTurn {
 pub struct Judgement {
     pub similarity: f64,
     pub won: bool,
+    pub won_by_entailment: bool,
     pub wrong_turn: Option<WrongTurn>,
 }
 
@@ -69,6 +73,7 @@ pub struct PreparedWord {
     other_meaning_vectors: Vec<Vec<f32>>,
     win_similarity: f64,
     edition: String,
+    right_texts: Vec<String>,
 }
 
 impl PreparedWord {
@@ -85,6 +90,7 @@ impl PreparedWord {
             other_meaning_vectors,
             win_similarity: WIN_SIMILARITY,
             edition: Uuid::new_v4().simple().to_string(),
+            right_texts: Vec::new(),
         }
     }
 
@@ -121,6 +127,7 @@ impl PreparedWord {
         Judgement {
             similarity,
             won: similarity >= self.win_similarity,
+            won_by_entailment: false,
             wrong_turn: wrong_turn_of(closest_right, closest_opposite, closest_other_meaning),
         }
     }
@@ -146,6 +153,7 @@ pub struct MeaningJudge {
     encoder: TeiEncoder,
     guess_vectors: Cache<String, Arc<Vec<f32>>>,
     letters: LetterRestorer,
+    entailment: Option<EntailmentChecker>,
 }
 
 impl MeaningJudge {
@@ -154,7 +162,13 @@ impl MeaningJudge {
             encoder,
             guess_vectors: Cache::new(GUESS_CACHE_SIZE),
             letters: LetterRestorer::new(),
+            entailment: None,
         }
+    }
+
+    pub fn with_entailment(mut self, checker: EntailmentChecker) -> MeaningJudge {
+        self.entailment = Some(checker);
+        self
     }
 
     async fn encode_all(&self, texts: &[String]) -> Result<Vec<Vec<f32>>, EncoderError> {
@@ -201,6 +215,10 @@ impl MeaningJudge {
         let mut right_texts = vec![puzzle.definition.clone()];
         right_texts.extend(puzzle.also_accepted.iter().cloned());
         let right_vectors = self.encode_all(&right_texts).await?;
+        let mut normalized_right_texts = Vec::new();
+        for text in &right_texts {
+            normalized_right_texts.push(normalize_text(text));
+        }
 
         let opposite_vectors = self.encode_all(&puzzle.opposite_meanings).await?;
         let other_meaning_vectors = self.encode_all(&puzzle.wrong_meanings).await?;
@@ -210,6 +228,7 @@ impl MeaningJudge {
             opposite_vectors,
             other_meaning_vectors,
         );
+        word.right_texts = normalized_right_texts;
 
         let wrong_test_vectors = self.encode_guesses(&word.puzzle.wrong_test_guesses).await?;
         let mut wrong_test_similarities = Vec::new();
@@ -225,10 +244,32 @@ impl MeaningJudge {
         word: &PreparedWord,
         guess: &str,
     ) -> Result<Judgement, EncoderError> {
-        let guess_vector = self
-            .encode_guess(self.letters.normalize_guess(guess))
-            .await?;
-        Ok(word.compare(&guess_vector))
+        let normalized_guess = self.letters.normalize_guess(guess);
+        let guess_vector = self.encode_guess(normalized_guess.clone()).await?;
+        let mut judgement = word.compare(&guess_vector);
+        if !judgement.won
+            && judgement.similarity >= ENTAILMENT_BAND_FLOOR
+            && self
+                .guess_implies_a_right_meaning(word, &normalized_guess)
+                .await
+        {
+            judgement.won = true;
+            judgement.won_by_entailment = true;
+        }
+        Ok(judgement)
+    }
+
+    async fn guess_implies_a_right_meaning(&self, word: &PreparedWord, guess: &str) -> bool {
+        let Some(checker) = &self.entailment else {
+            return false;
+        };
+        match checker.highest_entailment(guess, &word.right_texts).await {
+            Ok(entailment) => entailment >= ENTAILMENT_TO_WIN,
+            Err(error) => {
+                eprintln!("Çıkarım denetimi yapılamadı, yalnız benzerlik kullanıldı: {error}");
+                false
+            }
+        }
     }
 
     pub fn normalize_guess(&self, guess: &str) -> String {

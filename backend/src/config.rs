@@ -14,6 +14,7 @@ pub const ANTHROPIC_MESSAGES_URL: &str = "https://api.anthropic.com/v1/messages"
 pub struct Config {
     pub bind_address: String,
     pub tei_url: String,
+    pub nli_url: Option<String>,
     pub word_file: PathBuf,
     pub admin_token: Option<String>,
     pub client_ip_header: Option<HeaderName>,
@@ -51,6 +52,7 @@ impl Config {
         Config {
             bind_address: variable("BIND_ADDRESS").unwrap_or(DEFAULT_BIND_ADDRESS.to_string()),
             tei_url: variable("TEI_URL").unwrap_or(DEFAULT_TEI_URL.to_string()),
+            nli_url: variable("NLI_URL"),
             word_file: PathBuf::from(
                 variable("WORD_FILE").unwrap_or(DEFAULT_WORD_FILE.to_string()),
             ),

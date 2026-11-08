@@ -4,6 +4,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use sozcuklemece_backend::encoder::TeiEncoder;
+use sozcuklemece_backend::entailment::EntailmentChecker;
 use sozcuklemece_backend::puzzle::Puzzle;
 use sozcuklemece_backend::similarity::{MeaningJudge, PreparedWord, WIN_SIMILARITY};
 use sozcuklemece_backend::text::fold_turkish_letters;
@@ -39,18 +40,21 @@ async fn count_wins(
         if plain_letters {
             guess = fold_turkish_letters(&guess.to_lowercase());
         }
-        let similarity = judge
-            .similarity(word, &guess)
+        let judgement = judge
+            .evaluate(word, &guess)
             .await
             .expect("TEI tahmini değerlendiremedi");
-        let won = similarity >= WIN_SIMILARITY;
-        if won {
+        if judgement.won {
             wins += 1;
         }
-        if won != LABELS_THAT_SHOULD_WIN.contains(&label) {
+        let mut marker = "";
+        if judgement.won_by_entailment {
+            marker = " (çıkarım)";
+        }
+        if judgement.won != LABELS_THAT_SHOULD_WIN.contains(&label) {
             println!(
-                "  {similarity:5.2}  [{label}] {}: {guess}",
-                word.puzzle.word
+                "  {:5.2}{marker}  [{label}] {}: {guess}",
+                judgement.similarity, word.puzzle.word
             );
         }
     }
@@ -71,7 +75,11 @@ async fn main() {
     let tei_url = env::var("TEI_URL").unwrap_or(DEFAULT_TEI_URL.to_string());
     let puzzles: Vec<Puzzle> = read_json(&tools_directory().join("sample_puzzles.json"));
     let guesses_by_word: GuessesByWord = read_json(&guesses_path);
-    let judge = MeaningJudge::new(TeiEncoder::new(&tei_url));
+    let mut judge = MeaningJudge::new(TeiEncoder::new(&tei_url));
+    if let Ok(nli_url) = env::var("NLI_URL") {
+        judge = judge.with_entailment(EntailmentChecker::new(&nli_url));
+        println!("Sınırdaki tahminler {nli_url} ile çıkarım denetiminden geçiyor.");
+    }
 
     let mut wins_by_label: BTreeMap<String, usize> = BTreeMap::new();
     let mut totals_by_label: BTreeMap<String, usize> = BTreeMap::new();

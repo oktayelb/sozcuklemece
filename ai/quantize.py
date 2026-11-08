@@ -21,7 +21,7 @@ def read_texts(texts_path):
     with open(texts_path, encoding="utf-8") as file:
         for line in file:
             if line.strip():
-                texts.append(line.strip())
+                texts.append(line.strip("\n"))
     return texts
 
 
@@ -53,8 +53,13 @@ class CalibrationTexts(CalibrationDataReader):
     def get_next(self):
         if self.next_index >= len(self.texts):
             return None
-        encoding = self.tokenizer.encode(self.texts[self.next_index])
+        text = self.texts[self.next_index]
         self.next_index += 1
+        if "\t" in text:
+            first_text, second_text = text.split("\t", 1)
+            encoding = self.tokenizer.encode(first_text, second_text)
+        else:
+            encoding = self.tokenizer.encode(text)
 
         values = {
             "input_ids": encoding.ids,

@@ -204,6 +204,9 @@ function buildReportRow(result) {
   const verdict = document.createElement("span");
   verdict.className = "check-verdict";
   verdict.textContent = result.won ? "kazandı" : `%${result.closeness}`;
+  if (result.won_by_entailment) {
+    verdict.textContent += " (çıkarımla)";
+  }
   if (result.note) {
     verdict.textContent += ` · ${result.note}`;
   }
@@ -237,7 +240,7 @@ const REVIEW_VERDICTS = [
 ];
 
 function reviewDetails(item) {
-  const parts = [`%${item.closeness}`];
+  const parts = [item.won_by_entailment ? "çıkarımla kazandı" : `%${item.closeness}`];
   if (item.appeals > 0) {
     parts.push(`${item.appeals} itiraz`);
   }

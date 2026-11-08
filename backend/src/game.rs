@@ -506,6 +506,7 @@ mod tests {
         Judgement {
             similarity,
             won: similarity >= WIN_SIMILARITY,
+            won_by_entailment: false,
             wrong_turn: None,
         }
     }

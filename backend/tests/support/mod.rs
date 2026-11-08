@@ -74,6 +74,7 @@ pub enum FakeTeiMode {
 struct FakeTeiMemory {
     position_of_text: HashMap<String, usize>,
     encoded_texts: Vec<String>,
+    predicted_pairs: Vec<(String, String)>,
 }
 
 struct FakeTeiState {
@@ -83,6 +84,9 @@ struct FakeTeiState {
 
 pub const FAKE_TEI_MAX_WORDS: usize = 75;
 pub const NEAR_GUESS_PREFIX: &str = "neredeyse ";
+pub const ENTAILING_GUESS_PREFIX: &str = "yani ";
+const FAKE_ENTAILMENT: f64 = 0.95;
+const FAKE_NO_ENTAILMENT: f64 = 0.05;
 const NEAR_GUESS_SIMILARITY: f32 = 0.55;
 
 #[derive(Deserialize)]
@@ -125,7 +129,11 @@ async fn fake_embed(
     for text in request.inputs {
         let position = memory.position_of(&text);
         let mut vector = vec![0.0f32; VECTOR_SIZE];
-        match text.strip_prefix(NEAR_GUESS_PREFIX) {
+        let mut near_meaning = text.strip_prefix(NEAR_GUESS_PREFIX);
+        if near_meaning.is_none() {
+            near_meaning = text.strip_prefix(ENTAILING_GUESS_PREFIX);
+        }
+        match near_meaning {
             Some(meaning) => {
                 let meaning_position = memory.position_of(meaning);
                 vector[meaning_position] = NEAR_GUESS_SIMILARITY;
@@ -153,6 +161,42 @@ pub fn near_guess(meaning: &str) -> String {
     format!("{NEAR_GUESS_PREFIX}{}", normalize_text(meaning))
 }
 
+pub fn entailing_guess(meaning: &str) -> String {
+    format!("{ENTAILING_GUESS_PREFIX}{}", normalize_text(meaning))
+}
+
+#[derive(Deserialize)]
+struct PredictRequest {
+    inputs: Vec<(String, String)>,
+}
+
+fn fake_entailment(guess: &str, meaning: &str) -> f64 {
+    if guess.strip_prefix(ENTAILING_GUESS_PREFIX) == Some(meaning) {
+        return FAKE_ENTAILMENT;
+    }
+    FAKE_NO_ENTAILMENT
+}
+
+async fn fake_predict(
+    State(state): State<Arc<FakeTeiState>>,
+    Json(request): Json<PredictRequest>,
+) -> Response {
+    if *state.mode.lock().unwrap() != FakeTeiMode::Working {
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    }
+    let mut memory = state.memory.lock().unwrap();
+    let mut predictions = Vec::new();
+    for (guess, meaning) in request.inputs {
+        let entailment = fake_entailment(&guess, &meaning);
+        predictions.push(serde_json::json!([
+            { "label": "entailment", "score": entailment },
+            { "label": "neutral", "score": 1.0 - entailment },
+        ]));
+        memory.predicted_pairs.push((guess, meaning));
+    }
+    Json(predictions).into_response()
+}
+
 pub struct FakeTei {
     pub url: String,
     state: Arc<FakeTeiState>,
@@ -166,6 +210,7 @@ impl FakeTei {
         });
         let app = Router::new()
             .route("/embed", post(fake_embed))
+            .route("/predict", post(fake_predict))
             .with_state(state.clone());
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let url = format!("http://{}", listener.local_addr().unwrap());
@@ -175,6 +220,10 @@ impl FakeTei {
 
     pub fn set_mode(&self, mode: FakeTeiMode) {
         *self.state.mode.lock().unwrap() = mode;
+    }
+
+    pub fn predicted_pairs(&self) -> Vec<(String, String)> {
+        self.state.memory.lock().unwrap().predicted_pairs.clone()
     }
 
     pub fn encoded_texts(&self) -> Vec<String> {
@@ -346,6 +395,7 @@ fn test_config(tei: &FakeTei, turnstile: &FakeTurnstile, word_file: PathBuf) -> 
     Config {
         bind_address: "127.0.0.1:0".to_string(),
         tei_url: tei.url.clone(),
+        nli_url: None,
         word_file,
         admin_token: Some(ADMIN_TOKEN.to_string()),
         client_ip_header: Some(axum::http::HeaderName::from_static(CLIENT_IP_HEADER)),

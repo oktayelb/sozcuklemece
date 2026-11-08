@@ -3,6 +3,7 @@ pub mod clock;
 pub mod config;
 pub mod daily_word;
 pub mod encoder;
+pub mod entailment;
 pub mod game;
 pub mod players;
 pub mod puzzle;

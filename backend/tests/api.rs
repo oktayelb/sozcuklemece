@@ -11,11 +11,12 @@ use sozcuklemece_backend::rate_limit::{
     ADMIN_LIMIT, GUESS_LIMIT, GUESS_WINDOW_SECONDS, HINT_LIMIT, HINT_WINDOW_SECONDS, RESULT_LIMIT,
 };
 use sozcuklemece_backend::similarity::HIGHEST_WIN_SIMILARITY;
+use sozcuklemece_backend::text::normalize_text;
 use support::{
     ADMIN_TOKEN, ApiResponse, CLAUDE_API_KEY, FAKE_TEI_MAX_WORDS, FakeClaude, FakeTeiMode,
     FakeTurnstileMode, OTHER_ACTION_TURNSTILE_TOKEN, OTHER_SITE_TURNSTILE_TOKEN, PLAYER_IP,
     TESTING_KEY_TURNSTILE_TOKEN, TURNSTILE_SITE_KEY, TestServer, VALID_TURNSTILE_TOKEN,
-    first_puzzle, game_day_noon, near_guess, new_player_id, second_puzzle,
+    entailing_guess, first_puzzle, game_day_noon, near_guess, new_player_id, second_puzzle,
 };
 
 const UNKNOWN_GUESS: &str = "bambaşka bir açıklama";
@@ -1487,4 +1488,83 @@ async fn review_needs_the_right_password() {
         )
         .await;
     assert_eq!(response.status, StatusCode::UNAUTHORIZED);
+}
+
+async fn server_with_entailment() -> TestServer {
+    let server = TestServer::empty_with(|config| {
+        config.nli_url = Some(config.tei_url.clone());
+    })
+    .await;
+    assert_eq!(server.publish(&first_puzzle()).await.status, StatusCode::OK);
+    server
+}
+
+#[tokio::test]
+async fn borderline_guess_that_implies_the_meaning_wins() {
+    let server = server_with_entailment().await;
+    let game_id = server.start_game_id().await;
+    let guess = entailing_guess(&first_puzzle().definition);
+
+    let body = server.guess(&game_id, &guess).await.body;
+
+    assert_eq!(body["won"], true);
+    let review = admin_get(&server, "/api/admin/review").await.body;
+    assert_eq!(review["items"][0]["won_by_entailment"], true);
+}
+
+#[tokio::test]
+async fn borderline_guess_without_entailment_still_loses() {
+    let server = server_with_entailment().await;
+    let game_id = server.start_game_id().await;
+    let body = server
+        .guess(&game_id, &near_guess(&first_puzzle().definition))
+        .await
+        .body;
+    assert_eq!(body["won"], false);
+    assert_eq!(body["closeness"], 86);
+}
+
+#[tokio::test]
+async fn far_guess_skips_the_entailment_check() {
+    let server = server_with_entailment().await;
+    let game_id = server.start_game_id().await;
+    server.guess(&game_id, UNKNOWN_GUESS).await;
+    assert!(server.tei.predicted_pairs().is_empty());
+}
+
+#[tokio::test]
+async fn entailment_is_checked_against_every_right_meaning() {
+    let server = server_with_entailment().await;
+    let game_id = server.start_game_id().await;
+    let guess = near_guess(&first_puzzle().definition);
+    server.guess(&game_id, &guess).await;
+    let pairs = server.tei.predicted_pairs();
+    assert_eq!(pairs.len(), 1 + first_puzzle().also_accepted.len());
+    assert_eq!(pairs[0].1, normalize_text(&first_puzzle().definition));
+}
+
+#[tokio::test]
+async fn without_entailment_server_borderline_guess_loses() {
+    let server = TestServer::with_word().await;
+    let game_id = server.start_game_id().await;
+    let body = server
+        .guess(&game_id, &entailing_guess(&first_puzzle().definition))
+        .await
+        .body;
+    assert_eq!(body["won"], false);
+}
+
+#[tokio::test]
+async fn unreachable_entailment_server_falls_back_to_similarity() {
+    let server = TestServer::empty_with(|config| {
+        config.nli_url = Some("http://127.0.0.1:9".to_string());
+    })
+    .await;
+    server.publish(&first_puzzle()).await;
+    let game_id = server.start_game_id().await;
+    let response = server
+        .guess(&game_id, &entailing_guess(&first_puzzle().definition))
+        .await;
+    assert_eq!(response.status, StatusCode::OK);
+    assert_eq!(response.body["won"], false);
 }

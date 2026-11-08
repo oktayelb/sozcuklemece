@@ -18,6 +18,7 @@ use crate::daily_word::{
     DailyWordStore, MeaningSide, StoreError, game_day, moment_in_game_timezone,
 };
 use crate::encoder::{EncoderError, TeiEncoder};
+use crate::entailment::EntailmentChecker;
 use crate::game::{
     APPEAL_MIN_CLOSENESS, AppealRefusal, FinishResponse, GAME_SECONDS, GUESS_INTERVAL_SECONDS,
     Game, GuessCheck, GuessResponse, HINT_KINDS, HINT_PENALTY, HintKind, HintResponse, JudgedGuess,
@@ -58,7 +59,11 @@ pub struct AppState {
 
 impl AppState {
     pub fn new(config: Config, clock: Clock) -> AppState {
-        let judge = Arc::new(MeaningJudge::new(TeiEncoder::new(&config.tei_url)));
+        let mut judge = MeaningJudge::new(TeiEncoder::new(&config.tei_url));
+        if let Some(nli_url) = &config.nli_url {
+            judge = judge.with_entailment(EntailmentChecker::new(nli_url));
+        }
+        let judge = Arc::new(judge);
         let word_store = DailyWordStore::new(judge.clone(), config.word_file.clone());
         let turnstile = TurnstileVerifier::new(
             config.turnstile_secret_key.clone(),
@@ -479,6 +484,7 @@ struct TestGuessResult {
     text: String,
     expected: ExpectedVerdict,
     won: bool,
+    won_by_entailment: bool,
     as_expected: bool,
     closeness: i64,
     note: Option<&'static str>,
@@ -513,6 +519,7 @@ async fn test_guess_result(
         text: text.to_string(),
         expected,
         won: judgement.won,
+        won_by_entailment: judgement.won_by_entailment,
         as_expected,
         closeness,
         note,
@@ -781,16 +788,14 @@ async fn submit_guess(
     };
     let response = game.record_judged_guess(&body.text, &judgement, now);
     state.players.lock().unwrap().record_finish(game);
-    if !response.won
+    let key = state.judge.normalize_guess(&body.text);
+    let mut review = state.review.lock().unwrap();
+    if judgement.won_by_entailment {
+        review.record_entailment_win(word_to_judge.edition(), &key, &body.text);
+    } else if !response.won
         && let Some(closeness) = response.closeness
     {
-        let key = state.judge.normalize_guess(&body.text);
-        state.review.lock().unwrap().record_close_call(
-            word_to_judge.edition(),
-            &key,
-            &body.text,
-            closeness,
-        );
+        review.record_close_call(word_to_judge.edition(), &key, &body.text, closeness);
     }
     Ok(Json(response))
 }

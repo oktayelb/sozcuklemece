@@ -19,10 +19,11 @@ Burada aynı zamanda çokça kullanıcının siteye gireceği kalabalık zamanla
 
 ## Mimari
 
-Dört kapsayıcı:
+Beş kapsayıcı:
 
 - `frontend`: nginx. Statik dosyaları sunar, `/api/` isteklerini arka uca iletir. Dışarıya açık tek kapsayıcı budur.
 - `backend`: Rust arka uç. Oyunlar, puanlar, istek sınırı ve günün sözcüğü burada.
+- `nli`: ikinci bir TEI. Türkçe çıkarım (NLI) modeli [`emrecan/bert-base-turkish-cased-allnli_tr`](https://huggingface.co/emrecan/bert-base-turkish-cased-allnli_tr) (MIT) int8 olarak çalışır. Yalnızca sınırdaki tahminlere bakar, aşağıya bak. CPU sınırı `NLI_CPUS` (varsayılan 2).
 - `ai-1`, `ai-2`: [text-embeddings-inference](https://github.com/huggingface/text-embeddings-inference) (TEI). Modeli int8'e indirilmiş ONNX olarak çalıştırır, gelen istekleri kuyruğa alıp toplu işler. Model imaja gömülüdür, açılışta internete çıkmaz. Arka uç istekleri iki kopyaya sırayla dağıtır, biri bağlantıyı reddederse ötekine gider. Her kopyanın CPU sınırı `.env` içindeki `AI_CPUS` ile verilir (varsayılan 2). TEI iş parçacıklarını açılıştaki CPU sayısına göre kurduğu için sınır sonradan `docker update` ile değil, kapsayıcı açılırken verilmeli. Bu makinede iki 2 CPU'luk kopya, tek 4 CPU'luk kopyadan yaklaşık %15 daha çok istek işledi.
 
 ## Çalıştırma
@@ -34,7 +35,7 @@ Dört kapsayıcı:
 
 Ardından http://127.0.0.1:8000 adresini aç. İlk derleme modeli indirip ONNX'e çevirdiği için birkaç dakika sürer. Günün sözcüğü `word-data` biriminde durur, yeniden başlatmada kaybolmaz.
 
-Açılış sırası: iki `ai` kopyası sağlıklı olunca `backend`, `backend` hazır olunca `frontend` başlar. `backend` kayıtlı sözcüğü yükleyene kadar istek kabul etmez. nginx arka ucun adresini 10 saniyede bir yeniden çözer, bu yüzden yalnızca `backend` yeniden kurulduğunda da ön yüz çalışmaya devam eder.
+Açılış sırası: iki `ai` kopyası ve `nli` sağlıklı olunca `backend`, `backend` hazır olunca `frontend` başlar. `backend` kayıtlı sözcüğü yükleyene kadar istek kabul etmez. nginx arka ucun adresini 10 saniyede bir yeniden çözer, bu yüzden yalnızca `backend` yeniden kurulduğunda da ön yüz çalışmaya devam eder.
 
 Arka ucu kapsayıcı dışında çalıştırmak için:
 
@@ -44,7 +45,7 @@ Arka ucu kapsayıcı dışında çalıştırmak için:
     set -a && . ../.env && set +a
     cargo run --release
 
-Arka uç `TEI_URL` (varsayılan `http://127.0.0.1:8080`, birden çok kopya için virgülle ayrılır), `BIND_ADDRESS` (varsayılan `0.0.0.0:8000`) ve `WORD_FILE` (varsayılan `data/current_word.json`) ortam değişkenlerini okur.
+Arka uç `TEI_URL` (varsayılan `http://127.0.0.1:8080`, birden çok kopya için virgülle ayrılır), `NLI_URL` (boşsa çıkarım denetimi kapalı), `BIND_ADDRESS` (varsayılan `0.0.0.0:8000`) ve `WORD_FILE` (varsayılan `data/current_word.json`) ortam değişkenlerini okur.
 
 Testler: `cd backend && cargo test`
 
@@ -89,6 +90,8 @@ Doğruluğu örnek sözcüklerle ölçmek için TEI açıkken `backend` klasör�
 Hiç Türkçe harf (ç, ğ, ı, ö, ş, ü) içermeyen bir tahmin İngilizce klavyeyle yazılmış sayılır. Arka uç her sözcüğü en sık kullanılan Türkçe yazımına çevirir ("geldigini" → "geldiğini"). Sözcük listesi `backend/resources/turkish_words.txt`, [FrequencyWords](https://github.com/hermitdave/FrequencyWords) OpenSubtitles 2018 Türkçe listesinin ilk 200 bin sözcüğünden üretildi (CC BY-SA 4.0). Örnek tahminlerde harfler silinince doğru tahminlerin kazanma oranı %76'dan %49'a düşüyordu, çeviriyle %75 oldu. Sözcüğün kendisi de Türkçe harfsiz yazılırsa yakalanır.
 
 Model derlenirken `ai/quantize.py` ile int8'e indirilir. Ağırlık çarpımları `ai/calibration_texts.txt` içindeki örnek tanımlarla önceden ölçeklenir (statik nicemleme). Ölçekler sabit olduğu için bir tahminin skoru aynı anda işlenen diğer tahminlere bağlı değildir. Dinamik nicemleme daha basittir ama TEI istekleri toplu işlediği için skorlar yüke göre oynuyordu. Model ya da nicemleme değişirse kazanma eşiği `evaluate_guesses` ile yeniden ayarlanmalı.
+
+Benzerliği 0,40 ile kazanma eşiği arasında kalan tahminler ikinci bir denetimden geçer: çıkarım modeli tahminin doğru anlatımlardan birini gerektirip gerektirmediğine bakar (tahmin ⇒ tanım). Olasılık 0,90 ve üstüyse tahmin kazanır. Bu, tanımı değil somut bir örneği anlatan doğru tahminleri yakalar ("mutfağa gidip ne alacağını unutmak"). Örnek tahminlerde doğru tahminlerin kazanma oranı %76'dan %81'e çıktı, yanlış ve zıt tahminler yine %0 kaldı. Eşikler aynı örneklerle seçildi, yani gerçek oyuncu verisinde kazanç daha az olabilir. Tahminlerin yaklaşık beşte biri bu banda düşer. Bu makinede 2 CPU'lu `nli` saniyede yaklaşık 37 denetim yaptı (4 doğru anlatımla), tek denetim yaklaşık 30 ms ekler. Yani `nli` saniyede yaklaşık 185 tahmine yetişir, iki `ai` kopyasından (yaklaşık 290) önce dolar. Yük artarsa önce `NLI_CPUS` artırılmalı. Çıkarım sunucusu yoksa (`NLI_URL` boş) ya da yanıt vermezse yalnızca benzerlik kullanılır. Çıkarımla kazanan tahminler yönetim sayfasındaki listeye düşer. `evaluate_guesses` de `NLI_URL` ayarlıysa bu denetimi kullanır.
 
 Model en çok 75 parça (token) okur. Arka uç TEI'ye metni kesmemesini söyler: daha uzun bir tahmin sessizce kırpılmak yerine oyuncuya "çok uzun" diye geri döner, daha uzun bir tanım da yönetim sayfasında reddedilir. Olağan Türkçe metinde 200 karakter yaklaşık 40 parça eder.
 

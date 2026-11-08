@@ -1,0 +1,134 @@
+güzel bir şey bitmeden onu özlemek	yaşanmakta olan güzel bir anı biteceğini bilerek şimdiden özleme hissi
+mutlu bir anın sona ereceğini düşünüp hüzünlenmek	güzel bir şey bitmeden onu özlemek
+henüz yaşarken bir anı özlemeye başlamak	mutlu bir anın sona ereceğini düşünüp hüzünlenmek
+geçmişte kalmış güzel günleri özleme hissi	henüz yaşarken bir anı özlemeye başlamak
+gelecekte olacak bir şeyi sabırsızlıkla bekleme hissi	yaşanmakta olan güzel bir anı biteceğini bilerek şimdiden özleme hissi
+hiçbir şeyi özlememe hali	güzel bir şey bitmeden onu özlemek
+birini ya da bir şeyi özlemek	mutlu bir anın sona ereceğini düşünüp hüzünlenmek
+bir şeyin biteceğini bilmek	henüz yaşarken bir anı özlemeye başlamak
+tatilin son akşamında denize bakarken içimi bir önözlem kapladı	yaşanmakta olan güzel bir anı biteceğini bilerek şimdiden özleme hissi
+sosu silmeye yarayan ekmek lokması	tabakta kalan sosu sıyırmak için kullanılan ekmek parçası
+yemeğin sosuna banılan ekmek	sosu silmeye yarayan ekmek lokması
+tabağı temizlemek için kullanılan ekmek	yemeğin sosuna banılan ekmek
+tencerenin dibini kazımak için kullanılan mutfak aleti	tabağı temizlemek için kullanılan ekmek
+bulaşık yıkarken kullanılan sünger	tabakta kalan sosu sıyırmak için kullanılan ekmek parçası
+yüzeydeki boyayı kazıyan alet	sosu silmeye yarayan ekmek lokması
+yemek yemeye yarayan çatal ve kaşık	yemeğin sosuna banılan ekmek
+fırında pişirilen ekmek	tabağı temizlemek için kullanılan ekmek
+menemenin son lokmasını sıyırgaçla tabaktan topladı	tabakta kalan sosu sıyırmak için kullanılan ekmek parçası
+sorulara cevap vermekten kaçan siyasetçi	gazetecilerin sorularını yanıtlamadan ustaca geçiştiren siyasetçi
+soruları geçiştiren politikacı	sorulara cevap vermekten kaçan siyasetçi
+soruları lafı dolandırarak savuşturan kişi	soruları geçiştiren politikacı
+zor sorulardan sıyrılmayı bilen politikacı	soruları lafı dolandırarak savuşturan kişi
+her şeyi sorgulayan meraklı kişi	zor sorulardan sıyrılmayı bilen politikacı
+sorulan her soruyu açıkça yanıtlayan siyasetçi	gazetecilerin sorularını yanıtlamadan ustaca geçiştiren siyasetçi
+sınav sorularını hazırlayan kişi	sorulara cevap vermekten kaçan siyasetçi
+haber yazan gazeteci	soruları geçiştiren politikacı
+soru sormayı sevmeyen kişi	soruları lafı dolandırarak savuşturan kişi
+basın toplantısında yirmi soru geldi sorusavar başkandan tek cevap çıkmadı	zor sorulardan sıyrılmayı bilen politikacı
+ağaçların yer altında köklerle birbirine bağlandığı ağ	ormandaki ağaçların kökleri ve mantarlar aracılığıyla besin paylaştığı yeraltı ağı
+bitkilerin mantarlar sayesinde yer altında haberleştiği sistem	ağaçların yer altında köklerle birbirine bağlandığı ağ
+köklerin toprak altında oluşturduğu ağ	bitkilerin mantarlar sayesinde yer altında haberleştiği sistem
+toprak altında yetişen kök sebzeler	köklerin toprak altında oluşturduğu ağ
+bilgisayarların birbirine bağlandığı internet ağı	ormandaki ağaçların kökleri ve mantarlar aracılığıyla besin paylaştığı yeraltı ağı
+balık tutmak için kullanılan ağ	ağaçların yer altında köklerle birbirine bağlandığı ağ
+bir ağacın toprak altındaki kökü	bitkilerin mantarlar sayesinde yer altında haberleştiği sistem
+yer altında yetişen mantarlar	köklerin toprak altında oluşturduğu ağ
+yaşlı meşe kökağı sayesinde gölgedeki fidanlara şeker gönderir	ormandaki ağaçların kökleri ve mantarlar aracılığıyla besin paylaştığı yeraltı ağı
+tartışmadan sonra akla gelen iyi cevap	tartışma bittikten sonra çok geç olduğunda akla gelen mükemmel cevap
+o an söyleyemeyip sonradan akla gelen söz	tartışmadan sonra akla gelen iyi cevap
+geç akla gelen karşılık	o an söyleyemeyip sonradan akla gelen söz
+duş alırken şarkı söyleme alışkanlığı	geç akla gelen karşılık
+mesajlara çok hızlı cevap verme	tartışma bittikten sonra çok geç olduğunda akla gelen mükemmel cevap
+tartışma sırasında anında verilen mükemmel cevap	tartışmadan sonra akla gelen iyi cevap
+duşta düşünüp bulunan yeni fikirler	o an söyleyemeyip sonradan akla gelen söz
+duş alırken gelen telefona cevap vermek	geç akla gelen karşılık
+patronla konuşalı üç saat oldu aklıma şimdi geldi ama artık sadece bir duşyanıtı	tartışma bittikten sonra çok geç olduğunda akla gelen mükemmel cevap
+hesabı kimin ödeyeceği konusunda yapılan tartışma	restoranda hesabı kimin ödeyeceği konusunda arkadaşlar arasında yaşanan tatlı çekişme
+arkadaşların hesabı ödemek için birbiriyle yarışması	hesabı kimin ödeyeceği konusunda yapılan tartışma
+hesabı ben ödeyeceğim diye kavga etmek	arkadaşların hesabı ödemek için birbiriyle yarışması
+hesabı arkadaşlar arasında eşit olarak bölüşme	hesabı ben ödeyeceğim diye kavga etmek
+hesabı ödemeden restorandan kaçma	restoranda hesabı kimin ödeyeceği konusunda arkadaşlar arasında yaşanan tatlı çekişme
+matematik problemleri çözme yarışması	hesabı kimin ödeyeceği konusunda yapılan tartışma
+restoranda hesabı ödemek	arkadaşların hesabı ödemek için birbiriyle yarışması
+arkadaşlarla restoranda yemek yemek	hesabı ben ödeyeceğim diye kavga etmek
+garsonla hesap yüzünden kavga etmek	restoranda hesabı kimin ödeyeceği konusunda arkadaşlar arasında yaşanan tatlı çekişme
+kebabın ardından masada yine hesapgüreşi başladı garson kimi dinleyeceğini şaşırdı	hesabı kimin ödeyeceği konusunda yapılan tartışma
+sadece seçim zamanı halkın yanına gelen siyasetçi	yalnızca seçim dönemlerinde halkın yanında görünen siyasetçi
+seçim yaklaşınca halkı hatırlayan politikacı	sadece seçim zamanı halkın yanına gelen siyasetçi
+seçimden seçime ortaya çıkan vekil	seçim yaklaşınca halkı hatırlayan politikacı
+her seçimde oy kullanmayı seven vatandaş	seçimden seçime ortaya çıkan vekil
+eski sandıkları toplayan kişi	yalnızca seçim dönemlerinde halkın yanında görünen siyasetçi
+seçim olmasa da her zaman halkın arasında olan siyasetçi	sadece seçim zamanı halkın yanına gelen siyasetçi
+seçimi kazanmak isteyen aday	seçim yaklaşınca halkı hatırlayan politikacı
+çeyiz sandığı	seçimden seçime ortaya çıkan vekil
+dört yıldır ortada yoktu seçim yaklaşınca sandıksever vekil mahalleye geldi	yalnızca seçim dönemlerinde halkın yanında görünen siyasetçi
+hayvanların topluca akıllıca davranması	tek başına basit olan canlıların birlikte hareket ederken oluşturduğu ortak zeka
+kolektif zeka	hayvanların topluca akıllıca davranması
+bir topluluğun tek bir akıl gibi hareket etmesi	kolektif zeka
+karınca ya da arı gibi canlıların ortak zekası	bir topluluğun tek bir akıl gibi hareket etmesi
+başkalarına uyarak düşünmeden hareket etme	karınca ya da arı gibi canlıların ortak zekası
+hayvan sürülerini otlatan çoban	tek başına basit olan canlıların birlikte hareket ederken oluşturduğu ortak zeka
+tek başına çok zeki olan kişi	hayvanların topluca akıllıca davranması
+hayvan sürüsü	kolektif zeka
+araç sürmek	bir topluluğun tek bir akıl gibi hareket etmesi
+zeki hayvan türleri	karınca ya da arı gibi canlıların ortak zekası
+karıncaların en kısa yolu bulması sürüaklının en bilinen örneğidir	tek başına basit olan canlıların birlikte hareket ederken oluşturduğu ortak zeka
+telefonda boş boş ekranı kaydırmak	telefonda amaçsızca ekranı kaydırarak vakit öldürme alışkanlığı
+sosyal medyada amaçsızca gezinmek	telefonda boş boş ekranı kaydırmak
+ekranda durmadan gezinerek zaman harcamak	sosyal medyada amaçsızca gezinmek
+sosyal medyada kısa videolara dalıp saatler harcamak	ekranda durmadan gezinerek zaman harcamak
+karda ya da buzda kayarak oynanan çocuk oyunu	sosyal medyada kısa videolara dalıp saatler harcamak
+parkta kaydıraktan kayma	telefonda amaçsızca ekranı kaydırarak vakit öldürme alışkanlığı
+telefonu yalnızca gerektiğinde kullanma alışkanlığı	telefonda boş boş ekranı kaydırmak
+telefonla konuşmak	sosyal medyada amaçsızca gezinmek
+bir nesneyi itip başka yere taşımak	ekranda durmadan gezinerek zaman harcamak
+yatağa erken girdim ama kaydırmaca yüzünden üçe kadar uyuyamadım	sosyal medyada kısa videolara dalıp saatler harcamak
+bir yere gidince ne için gittiğini unutmak	bir odaya girince oraya neden geldiğini unutma durumu
+odaya girip neden geldiğini hatırlayamamak	bir yere gidince ne için gittiğini unutmak
+kapıdan geçince aklındakini unutmak	odaya girip neden geldiğini hatırlayamamak
+eşyalarını evde unutma	kapıdan geçince aklındakini unutmak
+tanıdığı birinin adını hatırlayamama	bir odaya girince oraya neden geldiğini unutma durumu
+neden geldiğini her zaman hatırlama	bir yere gidince ne için gittiğini unutmak
+genel olarak unutkan olmak	odaya girip neden geldiğini hatırlayamamak
+kapı eşiğinde durmak	kapıdan geçince aklındakini unutmak
+mutfağın ortasında dikildim kaldım yine eşikunutu ne alacaktım ben	bir odaya girince oraya neden geldiğini unutma durumu
+sırada yanında bekleyen kişi	uzun bir sırada yanında bekleyen ve çabucak kaynaştığın yabancı
+aynı kuyrukta beklediğin yabancı	sırada yanında bekleyen kişi
+kuyrukta sohbet ettiğin kişi	aynı kuyrukta beklediğin yabancı
+sırada beklemeden öne geçen kişi	kuyrukta sohbet ettiğin kişi
+hayvanların kuyruğunda bulunan kemik	uzun bir sırada yanında bekleyen ve çabucak kaynaştığın yabancı
+aynı işyerinde çalışan kişi	sırada yanında bekleyen kişi
+yolculukta yanında oturan kişi	aynı kuyrukta beklediğin yabancı
+uzun kuyrukta beklemek	kuyrukta sohbet ettiğin kişi
+bankada kırk dakika bekleyince kuyruktaşımla bütün hayatımızı konuştuk	uzun bir sırada yanında bekleyen ve çabucak kaynaştığın yabancı
+evden çıkarken ceplerini kontrol etmek	evden çıkmadan önce telefon cüzdan ve anahtarın yerinde olup olmadığını ceplere dokunarak kontrol etme
+telefon anahtar ve cüzdanın yanında olup olmadığına bakmak	evden çıkarken ceplerini kontrol etmek
+dışarı çıkmadan eşyalarının tam olduğundan emin olmak	telefon anahtar ve cüzdanın yanında olup olmadığına bakmak
+cepteki parayı sayma	dışarı çıkmadan eşyalarının tam olduğundan emin olmak
+öğretmenin sınıfta yoklama alması	evden çıkmadan önce telefon cüzdan ve anahtarın yerinde olup olmadığını ceplere dokunarak kontrol etme
+cep telefonunun faturasını ödeme	evden çıkarken ceplerini kontrol etmek
+kaybolan anahtarı aramak	telefon anahtar ve cüzdanın yanında olup olmadığına bakmak
+cepleri boşaltmak	dışarı çıkmadan eşyalarının tam olduğundan emin olmak
+hiçbir şeyi kontrol etmeden evden çıkmak	evden çıkmadan önce telefon cüzdan ve anahtarın yerinde olup olmadığını ceplere dokunarak kontrol etme
+kapıyı çekmeden önce son bir cepyoklaması yaptım neyse ki eksik yoktu	evden çıkarken ceplerini kontrol etmek
+bir yeri ev gibi hissetmek	yeni gidilen bir yeri kendi evi gibi hissetmek
+bir yere alışıp orayı yuvası gibi görmek	bir yeri ev gibi hissetmek
+yeni bir mekanı ev gibi sahiplenmek	bir yere alışıp orayı yuvası gibi görmek
+evini temizleyip düzenlemek	yeni bir mekanı ev gibi sahiplenmek
+evden uzaktayken evini özlemek	yeni gidilen bir yeri kendi evi gibi hissetmek
+bir yere hiçbir zaman alışamamak	bir yeri ev gibi hissetmek
+yeni bir ev satın almak	bir yere alışıp orayı yuvası gibi görmek
+yeni gidilen bir yerde yabancı hissetmek	yeni bir mekanı ev gibi sahiplenmek
+evi sevmek	yeni gidilen bir yeri kendi evi gibi hissetmek
+hiçbir yeri ev gibi hissedememek	bir yeri ev gibi hissetmek
+üç aydır bu şehirdeyim küçük mahallemizi yavaş yavaş evimsemeye başladım	bir yere alışıp orayı yuvası gibi görmek
+işi ertelemek için yapılan gereksiz şey	asıl yapılması gereken işi ertelemek için sarılınan önemsiz uğraş
+asıl işten kaçmak için oyalanılan küçük meşgale	işi ertelemek için yapılan gereksiz şey
+çalışmamak için bulunan önemsiz uğraş	asıl işten kaçmak için oyalanılan küçük meşgale
+çocukları oyalamak için verilen oyuncak	çalışmamak için bulunan önemsiz uğraş
+boş zamanlarda keyifle yapılan hobi	asıl yapılması gereken işi ertelemek için sarılınan önemsiz uğraş
+işleri ertelemeden hemen bitirme	işi ertelemek için yapılan gereksiz şey
+tembellik etmek	asıl işten kaçmak için oyalanılan küçük meşgale
+boş boş vakit geçirmek	çalışmamak için bulunan önemsiz uğraş
+tez yazacağıma yine kalemliği düzenliyorum bu da benim oyalancım	asıl yapılması gereken işi ertelemek için sarılınan önemsiz uğraş

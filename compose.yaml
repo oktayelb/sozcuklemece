@@ -19,6 +19,7 @@ services:
       TURNSTILE_HOSTNAME: ${TURNSTILE_HOSTNAME:?.env dosyasında TURNSTILE_HOSTNAME ayarlanmalı}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       TEI_URL: http://ai-1:80,http://ai-2:80
+      NLI_URL: http://nli:80
       CLIENT_IP_HEADER: X-Real-IP
     volumes:
       - word-data:/app/data
@@ -26,6 +27,8 @@ services:
       ai-1:
         condition: service_healthy
       ai-2:
+        condition: service_healthy
+      nli:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "/usr/local/bin/sozcuklemece-backend", "healthcheck"]
@@ -46,6 +49,19 @@ services:
     restart: unless-stopped
 
   ai-2: *ai
+
+  nli:
+    build:
+      context: ./ai
+      dockerfile: nli.Dockerfile
+    image: sozcuklemece-nli
+    cpus: ${NLI_CPUS:-2}
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost/health"]
+      interval: 5s
+      timeout: 3s
+      start_period: 60s
+    restart: unless-stopped
 
 volumes:
   word-data:
