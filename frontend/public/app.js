@@ -3,6 +3,8 @@ const TICK_MILLISECONDS = 200;
 const PENCIL_SOUND_FILES = ["sounds/pencil-1.mp3", "sounds/pencil-2.mp3", "sounds/pencil-3.mp3"];
 const PENCIL_SOUND_VOLUME = 0.7;
 const PLAYER_ID_STORAGE_KEY = "sozcuklemece-oyuncu";
+const MAX_GUESS_LENGTH = 200;
+const SHOW_LENGTH_FROM = 150;
 
 const game = {
   id: null,
@@ -13,6 +15,7 @@ const game = {
   remainingAtSync: 0,
   guessIntervalSeconds: 0,
   nextGuessAt: 0,
+  lastCloseness: null,
   deadline: 0,
   timerId: null,
   isStarting: false,
@@ -342,14 +345,37 @@ async function openHint(hint, slot) {
   }
 }
 
-function feedbackText(message, note) {
-  if (note) {
-    return `${message}. ${note}`;
+function changeText(change) {
+  if (change === null || change === 0) {
+    return "";
   }
-  return message;
+  if (change > 0) {
+    return `▲${change}`;
+  }
+  return `▼${-change}`;
 }
 
-function addGuessToList(text, closeness, label, note) {
+function feedbackText(message, change, note) {
+  let text = message;
+  if (changeText(change) !== "") {
+    text = `${text} ${changeText(change)}`;
+  }
+  if (note) {
+    text = `${text}. ${note}`;
+  }
+  return text;
+}
+
+function closenessChange(closeness) {
+  let change = null;
+  if (game.lastCloseness !== null) {
+    change = closeness - game.lastCloseness;
+  }
+  game.lastCloseness = closeness;
+  return change;
+}
+
+function addGuessToList(text, closeness, label, change, note) {
   const item = document.createElement("li");
   item.className = "guess-item";
 
@@ -367,6 +393,12 @@ function addGuessToList(text, closeness, label, note) {
   const verdict = document.createElement("span");
   verdict.className = "guess-verdict";
   verdict.textContent = `${label} · %${closeness}`;
+  if (changeText(change) !== "") {
+    const changeTag = document.createElement("span");
+    changeTag.className = change > 0 ? "guess-change guess-warmer" : "guess-change guess-colder";
+    changeTag.textContent = changeText(change);
+    verdict.append(" ", changeTag);
+  }
 
   item.append(guessText, meter, verdict);
   if (note) {
@@ -376,6 +408,13 @@ function addGuessToList(text, closeness, label, note) {
     item.append(noteLine);
   }
   element("guess-list").prepend(item);
+}
+
+function renderGuessLength() {
+  const length = element("guess-input").value.length;
+  const counter = element("guess-length");
+  counter.textContent = `${length}/${MAX_GUESS_LENGTH}`;
+  counter.hidden = length < SHOW_LENGTH_FROM;
 }
 
 async function submitGuess(event) {
@@ -399,10 +438,14 @@ async function submitGuess(event) {
     }
     syncWithServer(response);
     renderClock();
-    element("guess-feedback").textContent = feedbackText(response.message, response.note);
-    if (!response.rejected) {
-      addGuessToList(text, response.closeness, response.message, response.note);
+    if (response.rejected) {
+      element("guess-feedback").textContent = response.message;
+    } else {
+      const change = closenessChange(response.closeness);
+      element("guess-feedback").textContent = feedbackText(response.message, change, response.note);
+      addGuessToList(text, response.closeness, response.message, change, response.note);
       input.value = "";
+      renderGuessLength();
     }
   } catch (error) {
     element("guess-feedback").textContent = requestFailureMessage(error, "Tahmin gönderilemedi, tekrar dene.");
@@ -437,11 +480,14 @@ async function startGame() {
 
     element("game-word").textContent = started.word;
     element("guess-list").replaceChildren();
+    game.lastCloseness = null;
     for (const guess of started.guesses) {
-      addGuessToList(guess.text, guess.closeness, guess.label, guess.note);
+      const change = closenessChange(guess.closeness);
+      addGuessToList(guess.text, guess.closeness, guess.label, change, guess.note);
     }
     element("guess-feedback").textContent = "";
     element("guess-input").value = "";
+    renderGuessLength();
     const revealedTexts = new Map(started.revealed_hints.map((hint) => [hint.kind, hint.text]));
     const hintSlots = started.hints.map((hint) => buildHintSlot(hint, revealedTexts.get(hint.kind)));
     element("hint-list").replaceChildren(...hintSlots);
@@ -564,6 +610,7 @@ function renderCrowd(stats, myScore) {
 
 element("play-button").addEventListener("click", onPlayButton);
 element("guess-form").addEventListener("submit", submitGuess);
+element("guess-input").addEventListener("input", renderGuessLength);
 element("home-button").addEventListener("click", loadLandingPage);
 
 loadLandingPage();

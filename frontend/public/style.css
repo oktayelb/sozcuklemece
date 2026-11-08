@@ -419,6 +419,26 @@ p {
   border-bottom-color: var(--pen-blue);
 }
 
+.guess-length {
+  margin-top: 0.2rem;
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.guess-change {
+  font-weight: 600;
+}
+
+.guess-warmer {
+  color: var(--pencil-red);
+}
+
+.guess-colder {
+  color: var(--pen-blue);
+}
+
 .feedback {
   min-height: 2rem;
   margin-top: 0.6rem;
