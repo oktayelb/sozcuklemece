@@ -19,11 +19,11 @@ Burada aynı zamanda çokça kullanıcının siteye gireceği kalabalık zamanla
 
 ## Mimari
 
-Üç kapsayıcı:
+Dört kapsayıcı:
 
 - `frontend`: nginx. Statik dosyaları sunar, `/api/` isteklerini arka uca iletir. Dışarıya açık tek kapsayıcı budur.
 - `backend`: Rust arka uç. Oyunlar, puanlar, istek sınırı ve günün sözcüğü burada.
-- `ai`: [text-embeddings-inference](https://github.com/huggingface/text-embeddings-inference) (TEI). Modeli int8'e indirilmiş ONNX olarak çalıştırır, gelen istekleri kuyruğa alıp toplu işler. Model imaja gömülüdür, açılışta internete çıkmaz.
+- `ai-1`, `ai-2`: [text-embeddings-inference](https://github.com/huggingface/text-embeddings-inference) (TEI). Modeli int8'e indirilmiş ONNX olarak çalıştırır, gelen istekleri kuyruğa alıp toplu işler. Model imaja gömülüdür, açılışta internete çıkmaz. Arka uç istekleri iki kopyaya sırayla dağıtır, biri bağlantıyı reddederse ötekine gider. Her kopyanın CPU sınırı `.env` içindeki `AI_CPUS` ile verilir (varsayılan 2). TEI iş parçacıklarını açılıştaki CPU sayısına göre kurduğu için sınır sonradan `docker update` ile değil, kapsayıcı açılırken verilmeli. Bu makinede iki 2 CPU'luk kopya, tek 4 CPU'luk kopyadan yaklaşık %15 daha çok istek işledi.
 
 ## Çalıştırma
 
@@ -34,17 +34,17 @@ Burada aynı zamanda çokça kullanıcının siteye gireceği kalabalık zamanla
 
 Ardından http://127.0.0.1:8000 adresini aç. İlk derleme modeli indirip ONNX'e çevirdiği için birkaç dakika sürer. Günün sözcüğü `word-data` biriminde durur, yeniden başlatmada kaybolmaz.
 
-Açılış sırası: `ai` sağlıklı olunca `backend`, `backend` hazır olunca `frontend` başlar. `backend` kayıtlı sözcüğü yükleyene kadar istek kabul etmez. nginx arka ucun adresini 10 saniyede bir yeniden çözer, bu yüzden yalnızca `backend` yeniden kurulduğunda da ön yüz çalışmaya devam eder.
+Açılış sırası: iki `ai` kopyası sağlıklı olunca `backend`, `backend` hazır olunca `frontend` başlar. `backend` kayıtlı sözcüğü yükleyene kadar istek kabul etmez. nginx arka ucun adresini 10 saniyede bir yeniden çözer, bu yüzden yalnızca `backend` yeniden kurulduğunda da ön yüz çalışmaya devam eder.
 
 Arka ucu kapsayıcı dışında çalıştırmak için:
 
-    docker compose build ai
+    docker compose build ai-1
     docker run --rm -p 127.0.0.1:8080:80 sozcuklemece-ai
     cd backend
     set -a && . ../.env && set +a
     cargo run --release
 
-Arka uç `TEI_URL` (varsayılan `http://127.0.0.1:8080`), `BIND_ADDRESS` (varsayılan `0.0.0.0:8000`) ve `WORD_FILE` (varsayılan `data/current_word.json`) ortam değişkenlerini okur.
+Arka uç `TEI_URL` (varsayılan `http://127.0.0.1:8080`, birden çok kopya için virgülle ayrılır), `BIND_ADDRESS` (varsayılan `0.0.0.0:8000`) ve `WORD_FILE` (varsayılan `data/current_word.json`) ortam değişkenlerini okur.
 
 Testler: `cd backend && cargo test`
 

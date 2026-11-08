@@ -1,4 +1,5 @@
 use std::fmt;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
 use reqwest::StatusCode;
@@ -45,19 +46,52 @@ fn says_input_is_too_long(body: &TeiErrorBody) -> bool {
 
 pub struct TeiEncoder {
     http: reqwest::Client,
-    embed_url: String,
+    embed_urls: Vec<String>,
+    next_replica: AtomicUsize,
+}
+
+fn embed_urls_from(base_urls: &str) -> Vec<String> {
+    let mut embed_urls = Vec::new();
+    for base_url in base_urls.split(',') {
+        let base_url = base_url.trim();
+        if !base_url.is_empty() {
+            embed_urls.push(format!("{}/embed", base_url.trim_end_matches('/')));
+        }
+    }
+    embed_urls
 }
 
 impl TeiEncoder {
-    pub fn new(base_url: &str) -> TeiEncoder {
+    pub fn new(base_urls: &str) -> TeiEncoder {
         let http = reqwest::Client::builder()
             .timeout(REQUEST_TIMEOUT)
             .build()
             .expect("HTTP istemcisi kurulamadı");
+        let embed_urls = embed_urls_from(base_urls);
+        if embed_urls.is_empty() {
+            panic!("En az bir yapay zekâ sunucusu adresi verilmeli.");
+        }
         TeiEncoder {
             http,
-            embed_url: format!("{}/embed", base_url.trim_end_matches('/')),
+            embed_urls,
+            next_replica: AtomicUsize::new(0),
         }
+    }
+
+    async fn send(&self, request: &EmbedRequest<'_>) -> Result<reqwest::Response, EncoderError> {
+        let replica_count = self.embed_urls.len();
+        let first_replica = self.next_replica.fetch_add(1, Ordering::Relaxed);
+        let mut connection_error = String::new();
+        for attempt in 0..replica_count {
+            let embed_url = &self.embed_urls[(first_replica + attempt) % replica_count];
+            match self.http.post(embed_url).json(request).send().await {
+                Ok(response) => return Ok(response),
+                Err(error) if error.is_timeout() => return Err(EncoderError::Overloaded),
+                Err(error) if error.is_connect() => connection_error = error.to_string(),
+                Err(error) => return Err(EncoderError::Failed(error.to_string())),
+            }
+        }
+        Err(EncoderError::Failed(connection_error))
     }
 
     pub async fn encode(&self, texts: &[String]) -> Result<Vec<Vec<f32>>, EncoderError> {
@@ -74,11 +108,7 @@ impl TeiEncoder {
             normalize: true,
             truncate: false,
         };
-        let response = match self.http.post(&self.embed_url).json(&request).send().await {
-            Ok(response) => response,
-            Err(error) if error.is_timeout() => return Err(EncoderError::Overloaded),
-            Err(error) => return Err(EncoderError::Failed(error.to_string())),
-        };
+        let response = self.send(&request).await?;
 
         let status = response.status();
         if status == StatusCode::TOO_MANY_REQUESTS {

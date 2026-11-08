@@ -17,12 +17,14 @@ services:
       TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:?.env dosyasında TURNSTILE_SITE_KEY ayarlanmalı}
       TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:?.env dosyasında TURNSTILE_SECRET_KEY ayarlanmalı}
       TURNSTILE_HOSTNAME: ${TURNSTILE_HOSTNAME:?.env dosyasında TURNSTILE_HOSTNAME ayarlanmalı}
-      TEI_URL: http://ai:80
+      TEI_URL: http://ai-1:80,http://ai-2:80
       CLIENT_IP_HEADER: X-Real-IP
     volumes:
       - word-data:/app/data
     depends_on:
-      ai:
+      ai-1:
+        condition: service_healthy
+      ai-2:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "/usr/local/bin/sozcuklemece-backend", "healthcheck"]
@@ -31,15 +33,18 @@ services:
       start_period: 30s
     restart: unless-stopped
 
-  ai:
+  ai-1: &ai
     build: ./ai
     image: sozcuklemece-ai
+    cpus: ${AI_CPUS:-2}
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost/health"]
       interval: 5s
       timeout: 3s
       start_period: 60s
     restart: unless-stopped
+
+  ai-2: *ai
 
 volumes:
   word-data:
