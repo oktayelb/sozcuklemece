@@ -23,7 +23,8 @@ use crate::game::{
 use crate::puzzle::Puzzle;
 use crate::rate_limit::{
     ADMIN_LIMIT, ADMIN_WINDOW_SECONDS, GAME_START_LIMIT, GAME_START_WINDOW_SECONDS, GUESS_LIMIT,
-    GUESS_WINDOW_SECONDS, RateLimiter, UNKNOWN_CLIENT, rate_limit_key,
+    GUESS_WINDOW_SECONDS, HINT_LIMIT, HINT_WINDOW_SECONDS, RESULT_LIMIT, RESULT_WINDOW_SECONDS,
+    RateLimiter, UNKNOWN_CLIENT, rate_limit_key,
 };
 use crate::similarity::MeaningJudge;
 use crate::turnstile::{HumanCheck, START_GAME_ACTION, TurnstileVerifier};
@@ -39,6 +40,8 @@ pub struct AppState {
     turnstile: TurnstileVerifier,
     game_start_limiter: Mutex<RateLimiter>,
     guess_limiter: Mutex<RateLimiter>,
+    hint_limiter: Mutex<RateLimiter>,
+    result_limiter: Mutex<RateLimiter>,
     admin_limiter: Mutex<RateLimiter>,
 }
 
@@ -63,6 +66,8 @@ impl AppState {
                 GAME_START_WINDOW_SECONDS,
             )),
             guess_limiter: Mutex::new(RateLimiter::new(GUESS_LIMIT, GUESS_WINDOW_SECONDS)),
+            hint_limiter: Mutex::new(RateLimiter::new(HINT_LIMIT, HINT_WINDOW_SECONDS)),
+            result_limiter: Mutex::new(RateLimiter::new(RESULT_LIMIT, RESULT_WINDOW_SECONDS)),
             admin_limiter: Mutex::new(RateLimiter::new(ADMIN_LIMIT, ADMIN_WINDOW_SECONDS)),
         }
     }
@@ -394,9 +399,15 @@ async fn start_game(
 
 async fn reveal_hint(
     State(state): State<Arc<AppState>>,
+    client: Client,
     Path(game_id): Path<String>,
     Json(body): Json<HintRequest>,
 ) -> Result<Json<HintResponse>, ApiError> {
+    enforce_rate_limit(
+        &state.hint_limiter,
+        &client.rate_limit_key,
+        state.clock.monotonic_seconds(),
+    )?;
     let now = state.clock.monotonic_seconds();
     let mut games = state.games.lock().unwrap();
     let Some(game) = games.get_mut(&game_id) else {
@@ -449,8 +460,14 @@ async fn submit_guess(
 
 async fn finish_game(
     State(state): State<Arc<AppState>>,
+    client: Client,
     Path(game_id): Path<String>,
 ) -> Result<Json<FinishResponse>, ApiError> {
+    enforce_rate_limit(
+        &state.result_limiter,
+        &client.rate_limit_key,
+        state.clock.monotonic_seconds(),
+    )?;
     let now = state.clock.monotonic_seconds();
     let mut games = state.games.lock().unwrap();
     let Some(game) = games.get_mut(&game_id) else {

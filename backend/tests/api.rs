@@ -6,7 +6,9 @@ use serde_json::{Value, json};
 use sozcuklemece_backend::clock::Clock;
 use sozcuklemece_backend::daily_word::WORD_TTL_SECONDS;
 use sozcuklemece_backend::game::{GAME_RESULT_GRACE_SECONDS, GAME_SECONDS, GUESS_INTERVAL_SECONDS};
-use sozcuklemece_backend::rate_limit::{ADMIN_LIMIT, GUESS_LIMIT, GUESS_WINDOW_SECONDS};
+use sozcuklemece_backend::rate_limit::{
+    ADMIN_LIMIT, GUESS_LIMIT, GUESS_WINDOW_SECONDS, HINT_LIMIT, HINT_WINDOW_SECONDS, RESULT_LIMIT,
+};
 use support::{
     ADMIN_TOKEN, FakeTeiMode, FakeTurnstileMode, OTHER_ACTION_TURNSTILE_TOKEN,
     OTHER_SITE_TURNSTILE_TOKEN, PLAYER_IP, TESTING_KEY_TURNSTILE_TOKEN, TURNSTILE_SITE_KEY,
@@ -649,6 +651,47 @@ async fn hints_and_finish_still_work_after_the_guess_limit() {
 
     assert_eq!(hint.status, StatusCode::OK);
     assert_eq!(finish.status, StatusCode::OK);
+}
+
+async fn ask_for_hint(server: &TestServer, game_id: &str) -> StatusCode {
+    server
+        .post(
+            &format!("/api/games/{game_id}/hints"),
+            json!({ "kind": "parts" }),
+        )
+        .await
+        .status
+}
+
+#[tokio::test]
+async fn hints_are_rate_limited() {
+    let server = TestServer::with_word().await;
+    let game_id = server.start_game_id().await;
+    for _ in 0..HINT_LIMIT {
+        assert_eq!(ask_for_hint(&server, &game_id).await, StatusCode::OK);
+    }
+
+    assert_eq!(
+        ask_for_hint(&server, &game_id).await,
+        StatusCode::TOO_MANY_REQUESTS
+    );
+
+    server.advance_clock(HINT_WINDOW_SECONDS);
+    assert_eq!(ask_for_hint(&server, &game_id).await, StatusCode::OK);
+}
+
+#[tokio::test]
+async fn finish_is_rate_limited() {
+    let server = TestServer::with_word().await;
+    let game_id = server.start_game_id().await;
+    for _ in 0..RESULT_LIMIT {
+        assert_eq!(server.finish(&game_id).await.status, StatusCode::OK);
+    }
+
+    assert_eq!(
+        server.finish(&game_id).await.status,
+        StatusCode::TOO_MANY_REQUESTS
+    );
 }
 
 #[tokio::test]
