@@ -15,10 +15,12 @@ RUN pip install --no-cache-dir \
 
 RUN hf download "$MODEL_ID" --revision "$MODEL_REVISION" --local-dir /model \
     --exclude "openvino/*" "pytorch_model.bin" ".gitattributes" "README.md"
+COPY quantize.py calibration_texts.txt /quantization/
 RUN optimum-cli export onnx --model /model --task feature-extraction /exported \
     && mkdir /model/onnx \
-    && mv /exported/model.onnx /model/onnx/model.onnx \
-    && rm -rf /model/model.safetensors /model/.cache
+    && python /quantization/quantize.py /exported/model.onnx /model/onnx/model.onnx \
+        /model/tokenizer.json /quantization/calibration_texts.txt \
+    && rm -rf /model/model.safetensors /model/.cache /exported /tmp/prepared_model.onnx
 
 FROM ghcr.io/huggingface/text-embeddings-inference:cpu-1.9
 

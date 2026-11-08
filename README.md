@@ -23,7 +23,7 @@ Burada aynı zamanda çokça kullanıcının siteye gireceği kalabalık zamanla
 
 - `frontend`: nginx. Statik dosyaları sunar, `/api/` isteklerini arka uca iletir. Dışarıya açık tek kapsayıcı budur.
 - `backend`: Rust arka uç. Oyunlar, puanlar, istek sınırı ve günün sözcüğü burada.
-- `ai`: [text-embeddings-inference](https://github.com/huggingface/text-embeddings-inference) (TEI). Modeli ONNX olarak çalıştırır, gelen istekleri kuyruğa alıp toplu işler. Model imaja gömülüdür, açılışta internete çıkmaz.
+- `ai`: [text-embeddings-inference](https://github.com/huggingface/text-embeddings-inference) (TEI). Modeli int8'e indirilmiş ONNX olarak çalıştırır, gelen istekleri kuyruğa alıp toplu işler. Model imaja gömülüdür, açılışta internete çıkmaz.
 
 ## Çalıştırma
 
@@ -76,6 +76,8 @@ Doğruluğu örnek sözcüklerle ölçmek için TEI açıkken `backend` klasör�
 
     cargo run --release --bin evaluate_guesses
     cargo test -- --ignored
+
+Model derlenirken `ai/quantize.py` ile int8'e indirilir. Ağırlık çarpımları `ai/calibration_texts.txt` içindeki örnek tanımlarla önceden ölçeklenir (statik nicemleme). Ölçekler sabit olduğu için bir tahminin skoru aynı anda işlenen diğer tahminlere bağlı değildir. Dinamik nicemleme daha basittir ama TEI istekleri toplu işlediği için skorlar yüke göre oynuyordu. Model ya da nicemleme değişirse kazanma eşiği `evaluate_guesses` ile yeniden ayarlanmalı.
 
 Oyun ayarları: kazanma eşiği ve önbellek boyutu `backend/src/similarity.rs`, süre ve puan `backend/src/game.rs`, sözcüğün ömrü `backend/src/daily_word.rs`, istek sınırları `backend/src/rate_limit.rs`.
 

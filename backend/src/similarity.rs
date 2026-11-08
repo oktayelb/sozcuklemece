@@ -6,7 +6,7 @@ use crate::encoder::{EncoderError, TeiEncoder};
 use crate::puzzle::Puzzle;
 use crate::text::normalize_text;
 
-pub const WIN_SIMILARITY: f64 = 0.625;
+pub const WIN_SIMILARITY: f64 = 0.615;
 pub const ZERO_CLOSENESS_SIMILARITY: f64 = 0.15;
 pub const HIGHEST_CLOSENESS_WITHOUT_WIN: i64 = 99;
 pub const GUESS_CACHE_SIZE: u64 = 1000;
