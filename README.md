@@ -19,34 +19,34 @@ Burada aynı zamanda çokça kullanıcının siteye gireceği kalabalık zamanla
 
 ## Çalıştırma
 
-    uv sync
-    ADMIN_TOKEN=uzun-rastgele-bir-parola uv run uvicorn backend.main:app --port 8000
+Arka uç Rust ile yazıldı, modeli [text-embeddings-inference](https://github.com/huggingface/text-embeddings-inference) (TEI) çalıştırır.
 
-Ardından http://127.0.0.1:8000 adresini aç. İlk açılışta model (yaklaşık 450 MB) indirilir.
+    docker run --rm -p 127.0.0.1:8080:80 ghcr.io/huggingface/text-embeddings-inference:cpu-1.9 --model-id emrecan/bert-base-turkish-cased-mean-nli-stsb-tr
+    cd backend
+    ADMIN_TOKEN=uzun-rastgele-bir-parola cargo run --release
 
-Testler: `uv run pytest`
+Arka uç `TEI_URL` (varsayılan `http://127.0.0.1:8080`), `BIND_ADDRESS` (varsayılan `0.0.0.0:8000`) ve `WORD_FILE` (varsayılan `data/current_word.json`) ortam değişkenlerini okur.
 
-## Docker ile çalıştırma
-
-    ADMIN_TOKEN=uzun-rastgele-bir-parola docker compose up -d --build
-
-Model imajın içine indirilir, kapsayıcı açılışta internete çıkmaz. Günün sözcüğü `word-data` biriminde durur, yeniden başlatmada kaybolmaz. Ters vekil ayrı bir kapsayıcıdaysa `FORWARDED_ALLOW_IPS` ortam değişkenine vekilin IP'sini ver.
+Testler: `cd backend && cargo test`
 
 ## Günün sözcüğünü yükleme
 
-http://127.0.0.1:8000/admin/ adresini aç, `ADMIN_TOKEN` parolasını gir, formu doldurup yayınla. `ADMIN_TOKEN` ayarlı değilse yükleme kapalıdır. Parola düz metin gittiği için canlıda HTTPS kullan.
+`/admin/` sayfasını aç, `ADMIN_TOKEN` parolasını gir, formu doldurup yayınla. `ADMIN_TOKEN` ayarlı değilse yükleme kapalıdır. Parola düz metin gittiği için canlıda HTTPS kullan.
 
 - Sözcüğün işlenmiş hali yüklenirken hazırlanır ve bellekte durur, tahminlerde yeniden hesaplanmaz.
 - Yeni sözcük hemen oyuna girer, önceki sözcük bellekten ve diskten silinir. O sırada süren oyunlar kendi sözcükleriyle biter.
 - Sözcük yüklendikten 24 saat sonra kendiliğinden silinir. Yenisi yüklenene kadar oyun başlatılamaz.
-- Sunucu yeniden başlarsa sözcük `data/current_word.json` dosyasından okunup yeniden hazırlanır. Bu dosya depoya girmez.
+- Sunucu yeniden başlarsa sözcük `WORD_FILE` dosyasından okunup yeniden hazırlanır. Bu dosya depoya girmez.
 
-Doğruluğu örnek sözcüklerle ölçmek için: `uv run python -m tools.evaluate_guesses`
+Doğruluğu örnek sözcüklerle ölçmek için TEI açıkken `backend` klasöründe:
 
-Oyun ayarları: kazanma eşiği `backend/similarity.py`, süre ve puan `backend/game.py`, sözcüğün ömrü `backend/daily_word.py`, istek sınırları `backend/rate_limit.py`.
+    cargo run --release --bin evaluate_guesses
+    cargo test -- --ignored
+
+Oyun ayarları: kazanma eşiği `backend/src/similarity.rs`, süre ve puan `backend/src/game.rs`, sözcüğün ömrü `backend/src/daily_word.rs`, istek sınırları `backend/src/rate_limit.rs`.
 
 ## İstek sınırı
 
-Oyun başlatma, tahmin ve yönetim istekleri IP başına sınırlı. Sınır aşılınca sunucu 429 ve `Retry-After` döner. Sayaçlar oyunlar gibi süreç belleğinde tutuluyor, bu yüzden tek süreçle çalışır.
+Oyun başlatma, tahmin ve yönetim istekleri IP başına sınırlı. Sınır aşılınca sunucu 429 ve `Retry-After` döner. Sayaçlar oyunlar gibi süreç belleğinde tutuluyor, bu yüzden arka uç tek kopya çalışır.
 
-Ters vekil (nginx vb.) başka bir makinedeyse uvicorn'a `--forwarded-allow-ips <vekil-ip>` ver, yoksa bütün oyuncular tek IP sayılır.
+Arka uç bir ters vekilin (nginx vb.) arkasındaysa `CLIENT_IP_HEADER=X-Real-IP` ver, yoksa bütün oyuncular tek IP sayılır. Bu başlığa yalnızca vekil dışarıya kapalıyken güven, yoksa oyuncular IP'lerini taklit edebilir.
