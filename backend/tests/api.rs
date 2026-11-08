@@ -6,13 +6,16 @@ use serde_json::{Value, json};
 use sozcuklemece_backend::clock::Clock;
 use sozcuklemece_backend::daily_word::WORD_TTL_SECONDS;
 use sozcuklemece_backend::game::{GAME_RESULT_GRACE_SECONDS, GAME_SECONDS, GUESS_INTERVAL_SECONDS};
+use sozcuklemece_backend::puzzle::Puzzle;
 use sozcuklemece_backend::rate_limit::{
     ADMIN_LIMIT, GUESS_LIMIT, GUESS_WINDOW_SECONDS, HINT_LIMIT, HINT_WINDOW_SECONDS, RESULT_LIMIT,
 };
+use sozcuklemece_backend::similarity::HIGHEST_WIN_SIMILARITY;
 use support::{
-    ADMIN_TOKEN, FAKE_TEI_MAX_WORDS, FakeTeiMode, FakeTurnstileMode, OTHER_ACTION_TURNSTILE_TOKEN,
-    OTHER_SITE_TURNSTILE_TOKEN, PLAYER_IP, TESTING_KEY_TURNSTILE_TOKEN, TURNSTILE_SITE_KEY,
-    TestServer, VALID_TURNSTILE_TOKEN, first_puzzle, game_day_noon, new_player_id, second_puzzle,
+    ADMIN_TOKEN, CLAUDE_API_KEY, FAKE_TEI_MAX_WORDS, FakeClaude, FakeTeiMode, FakeTurnstileMode,
+    OTHER_ACTION_TURNSTILE_TOKEN, OTHER_SITE_TURNSTILE_TOKEN, PLAYER_IP,
+    TESTING_KEY_TURNSTILE_TOKEN, TURNSTILE_SITE_KEY, TestServer, VALID_TURNSTILE_TOKEN,
+    first_puzzle, game_day_noon, new_player_id, second_puzzle,
 };
 
 const UNKNOWN_GUESS: &str = "bambaşka bir açıklama";
@@ -1164,4 +1167,143 @@ async fn definition_longer_than_the_model_reads_is_refused() {
         server.start_game().await["word"],
         first_puzzle().word.as_str()
     );
+}
+
+fn puzzle_with_test_guesses() -> Puzzle {
+    let mut puzzle = second_puzzle();
+    puzzle.right_test_guesses = vec![
+        puzzle.definition.clone(),
+        "bambaşka bir açıklama".to_string(),
+    ];
+    puzzle.wrong_test_guesses = vec![puzzle.wrong_meanings[0].clone()];
+    puzzle
+}
+
+#[tokio::test]
+async fn check_reports_how_each_test_guess_is_judged() {
+    let server = TestServer::empty().await;
+    let puzzle = puzzle_with_test_guesses();
+    let response = server.admin_post("/api/admin/word/check", &puzzle).await;
+    assert_eq!(response.status, StatusCode::OK, "{}", response.body);
+
+    let results = response.body["test_guesses"].as_array().unwrap();
+    assert_eq!(results.len(), 3);
+    assert_eq!(results[0]["expected"], "right");
+    assert_eq!(results[0]["won"], true);
+    assert_eq!(results[0]["as_expected"], true);
+    assert_eq!(results[1]["won"], false);
+    assert_eq!(results[1]["as_expected"], false);
+    assert_eq!(results[2]["expected"], "wrong");
+    assert_eq!(results[2]["as_expected"], true);
+    assert_eq!(results[2]["note"], "Konu yakın, anlam başka.");
+    assert_eq!(response.body["threshold_raised"], false);
+}
+
+#[tokio::test]
+async fn wrong_test_guess_that_would_win_raises_the_threshold() {
+    let server = TestServer::empty().await;
+    let mut puzzle = second_puzzle();
+    puzzle.wrong_test_guesses = vec![puzzle.also_accepted[0].clone()];
+    let body = server
+        .admin_post("/api/admin/word/check", &puzzle)
+        .await
+        .body;
+    assert_eq!(body["threshold_raised"], true);
+    assert_eq!(body["win_similarity"], HIGHEST_WIN_SIMILARITY);
+    assert_eq!(body["test_guesses"][0]["as_expected"], false);
+}
+
+#[tokio::test]
+async fn check_does_not_publish_the_word() {
+    let server = TestServer::empty().await;
+    server
+        .admin_post("/api/admin/word/check", &puzzle_with_test_guesses())
+        .await;
+    assert_eq!(server.get("/api/today").await.body["word_available"], false);
+}
+
+#[tokio::test]
+async fn check_needs_the_right_password() {
+    let server = TestServer::empty().await;
+    let response = server
+        .call(
+            Method::POST,
+            "/api/admin/word/check",
+            Some(serde_json::to_value(second_puzzle()).unwrap()),
+            &[("x-admin-token", "yanlış")],
+        )
+        .await;
+    assert_eq!(response.status, StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn published_test_guesses_survive_a_restart() {
+    let server = TestServer::empty().await;
+    let puzzle = puzzle_with_test_guesses();
+    assert_eq!(server.publish(&puzzle).await.status, StatusCode::OK);
+    let restarted = server.restarted(Clock::manual(game_day_noon())).await;
+    let live = restarted
+        .state
+        .word_store
+        .current_word(game_day_noon())
+        .unwrap();
+    assert_eq!(
+        live.word.puzzle.right_test_guesses,
+        puzzle.right_test_guesses
+    );
+}
+
+#[tokio::test]
+async fn writing_test_guesses_needs_an_api_key() {
+    let server = TestServer::empty().await;
+    let response = server
+        .admin_post("/api/admin/word/test-guesses", &second_puzzle())
+        .await;
+    assert_eq!(response.status, StatusCode::SERVICE_UNAVAILABLE);
+}
+
+#[tokio::test]
+async fn test_guesses_are_written_by_claude() {
+    let claude = FakeClaude::start(Some(
+        r#"{"right":["sosu silen ekmek"],"wrong":["tencere kazıyıcı"]}"#,
+    ))
+    .await;
+    let messages_url = claude.messages_url.clone();
+    let server = TestServer::empty_with(move |config| {
+        config.anthropic_api_key = Some(CLAUDE_API_KEY.to_string());
+        config.anthropic_messages_url = messages_url.clone();
+    })
+    .await;
+
+    let response = server
+        .admin_post("/api/admin/word/test-guesses", &second_puzzle())
+        .await;
+
+    assert_eq!(response.status, StatusCode::OK, "{}", response.body);
+    assert_eq!(
+        response.body,
+        json!({ "right": ["sosu silen ekmek"], "wrong": ["tencere kazıyıcı"] })
+    );
+    let requests = claude.requests();
+    assert_eq!(requests.len(), 1);
+    assert_eq!(requests[0].headers["x-api-key"], CLAUDE_API_KEY);
+    assert_eq!(requests[0].headers["anthropic-version"], "2026-10-21");
+    assert_eq!(requests[0].body["model"], "claude-opus-5-5");
+    let prompt = requests[0].body["messages"][0]["content"].as_str().unwrap();
+    assert!(prompt.contains(&second_puzzle().definition));
+}
+
+#[tokio::test]
+async fn failed_writing_is_reported() {
+    let claude = FakeClaude::start(None).await;
+    let messages_url = claude.messages_url.clone();
+    let server = TestServer::empty_with(move |config| {
+        config.anthropic_api_key = Some(CLAUDE_API_KEY.to_string());
+        config.anthropic_messages_url = messages_url.clone();
+    })
+    .await;
+    let response = server
+        .admin_post("/api/admin/word/test-guesses", &second_puzzle())
+        .await;
+    assert_eq!(response.status, StatusCode::BAD_GATEWAY);
 }

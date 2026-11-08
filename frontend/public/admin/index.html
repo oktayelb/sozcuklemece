@@ -77,6 +77,28 @@
         </label>
       </fieldset>
 
+      <fieldset class="admin-group">
+        <legend>Deneme tahminleri</legend>
+        <p class="admin-help">Oyuncuların yazabileceği tahminler. Yayınlamadan önce yapay zekânın bunları nasıl değerlendirdiğini dene. Kazanmaması gereken bir tahmin eşiği geçerse bu sözcüğün kazanma eşiği onun üstüne çıkar (en çok 0,70).</p>
+        <label class="admin-field">
+          <span class="admin-label">Kazanması gerekenler</span>
+          <textarea name="right_test_guesses" rows="5"></textarea>
+        </label>
+        <label class="admin-field">
+          <span class="admin-label">Kazanmaması gerekenler</span>
+          <textarea name="wrong_test_guesses" rows="5"></textarea>
+        </label>
+        <div class="admin-actions">
+          <button id="write-tests-button" class="button" type="button">Yapay zekâya yazdır</button>
+          <button id="check-button" class="button" type="button">Dene</button>
+        </div>
+        <p id="check-message" class="admin-message" role="status"></p>
+        <div id="check-report" class="check-report" hidden>
+          <p id="check-summary" class="check-summary"></p>
+          <ol id="check-list" class="check-list"></ol>
+        </div>
+      </fieldset>
+
       <button id="publish-button" class="button admin-publish" type="submit">Yayınla</button>
       <p class="admin-help">Yayınlanan sözcük hemen oyuna girer, önceki sözcük silinir. 24 saat sonra kendiliğinden silinir.</p>
       <p id="form-message" class="admin-message" role="alert"></p>

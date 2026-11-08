@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::puzzle::Puzzle;
-use crate::similarity::{Judgement, PreparedWord, WrongTurn, closeness_percent};
+use crate::similarity::{Judgement, PreparedWord, WrongTurn};
 use crate::text::{compact_text, fold_turkish_letters, normalize_text};
 
 pub const GAME_SECONDS: f64 = 180.0;
@@ -375,7 +375,7 @@ impl Game {
             closeness = WIN_CLOSENESS;
             self.finish(now, true);
         } else {
-            closeness = closeness_percent(judgement.similarity);
+            closeness = self.word.closeness_of(judgement.similarity);
             if let Some(wrong_turn) = judgement.wrong_turn {
                 note = Some(wrong_turn_note(wrong_turn));
             }
@@ -413,7 +413,7 @@ impl Game {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::similarity::WIN_SIMILARITY;
+    use crate::similarity::{WIN_SIMILARITY, closeness_percent};
 
     const START: f64 = 1000.0;
 
@@ -429,6 +429,8 @@ mod tests {
             opposite_meanings: vec![],
             wrong_meanings: vec![],
             inflected_stems: vec![],
+            right_test_guesses: vec![],
+            wrong_test_guesses: vec![],
         }
     }
 
@@ -678,7 +680,7 @@ mod tests {
         let guesses = game.judged_guesses();
         assert_eq!(guesses.len(), 1);
         assert_eq!(guesses[0].text, "sosu silen kaşık");
-        assert_eq!(guesses[0].closeness, closeness_percent(0.3));
+        assert_eq!(guesses[0].closeness, closeness_percent(0.3, WIN_SIMILARITY));
     }
 
     #[test]

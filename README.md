@@ -67,6 +67,8 @@ nginx ön yüz dosyalarını önbellek başlıklarıyla sunar: HTML, JS ve CSS 5
 `/admin/` sayfasını aç, `ADMIN_TOKEN` parolasını gir, formu doldurup yayınla. `ADMIN_TOKEN` ayarlı değilse yükleme kapalıdır. Parola düz metin gittiği için canlıda HTTPS kullan.
 
 - Sözcüğün işlenmiş hali yüklenirken hazırlanır ve bellekte durur, tahminlerde yeniden hesaplanmaz.
+- Yayınlamadan önce "Deneme tahminleri" bölümüne oyuncuların yazabileceği tahminleri yazıp "Dene"ye bas. Sayfa hangilerinin yanlış değerlendirildiğini gösterir, yanlış değerlendirileni tek tıkla doğru anlatımlara ya da yanlış anlamlara taşırsın. `.env` içinde `ANTHROPIC_API_KEY` ayarlıysa "Yapay zekâya yazdır" bu tahminleri Claude'a (`claude-opus-5-5`) yazdırır, sözcüğün tanımı ve ipuçları Anthropic'e gider. Anahtar yoksa tahminler elle yazılır.
+- Kazanmaması gereken bir deneme tahmini eşiği geçerse o sözcüğün kazanma eşiği onun 0,02 üstüne çıkar (en çok 0,70). Eşik hiç düşmez: örnek tahminlerle yapılan denemede eşiği düşürmek doğru tahminleri artırdı ama yanlış tahminlerin %2-3'ünü de kazandırdı.
 - Zıt anlamlar ve yanlış anlamlar ayrı listelerdir. İkisi de kazanmayı zorlaştırır. Tahmin bunlardan birine doğru anlamlardan daha yakınsa oyuncu "Tersini söylüyor gibisin" ya da "Konu yakın, anlam başka" notunu görür.
 - Yeni sözcük hemen oyuna girer, önceki sözcük bellekten ve diskten silinir. O sırada süren oyunlar kendi sözcükleriyle biter.
 - Sözcük yüklendikten 24 saat sonra kendiliğinden silinir. Yenisi yüklenene kadar oyun başlatılamaz.

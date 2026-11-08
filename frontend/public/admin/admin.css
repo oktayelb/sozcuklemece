@@ -88,3 +88,61 @@
   color: var(--pencil-red);
   font-style: italic;
 }
+
+.admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+}
+
+.check-summary {
+  color: var(--ink);
+}
+
+.check-list {
+  margin: 0.6rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.check-row {
+  display: grid;
+  grid-template-columns: 1.2rem minmax(0, 1fr) auto;
+  gap: 0.2rem 0.6rem;
+  align-items: baseline;
+  padding: 0.3rem 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.check-mark {
+  color: var(--ink-soft);
+}
+
+.check-row-off .check-mark {
+  color: var(--pencil-red);
+  font-weight: 600;
+}
+
+.check-text {
+  color: var(--pen-blue);
+  overflow-wrap: anywhere;
+}
+
+.check-verdict {
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+  text-align: right;
+}
+
+.check-move {
+  grid-column: 2 / -1;
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  color: var(--pencil-red);
+  background: none;
+  font-family: var(--serif);
+  font-size: 0.85rem;
+  text-decoration: underline;
+  cursor: pointer;
+}

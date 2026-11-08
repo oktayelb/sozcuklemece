@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 
 pub const MAX_SHORT_TEXT_LENGTH: usize = 60;
 pub const MAX_LONG_TEXT_LENGTH: usize = 500;
+pub const MAX_LIST_LENGTH: usize = 60;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Puzzle {
@@ -19,6 +20,10 @@ pub struct Puzzle {
     pub wrong_meanings: Vec<String>,
     #[serde(default)]
     pub inflected_stems: Vec<String>,
+    #[serde(default)]
+    pub right_test_guesses: Vec<String>,
+    #[serde(default)]
+    pub wrong_test_guesses: Vec<String>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -42,6 +47,9 @@ fn cleaned_list(
     texts: &[String],
     max_length: usize,
 ) -> Result<Vec<String>, InvalidField> {
+    if texts.len() > MAX_LIST_LENGTH {
+        return Err(InvalidField(field));
+    }
     let mut cleaned = Vec::new();
     for text in texts {
         cleaned.push(cleaned_text(field, text, max_length)?);
@@ -78,6 +86,16 @@ impl Puzzle {
                 &self.inflected_stems,
                 MAX_SHORT_TEXT_LENGTH,
             )?,
+            right_test_guesses: cleaned_list(
+                "right_test_guesses",
+                &self.right_test_guesses,
+                MAX_LONG_TEXT_LENGTH,
+            )?,
+            wrong_test_guesses: cleaned_list(
+                "wrong_test_guesses",
+                &self.wrong_test_guesses,
+                MAX_LONG_TEXT_LENGTH,
+            )?,
         })
     }
 }
@@ -98,6 +116,8 @@ mod tests {
             opposite_meanings: vec![],
             wrong_meanings: vec![],
             inflected_stems: vec![],
+            right_test_guesses: vec![],
+            wrong_test_guesses: vec![],
         }
     }
 

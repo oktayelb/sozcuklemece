@@ -131,6 +131,8 @@ mod tests {
             opposite_meanings: vec![],
             wrong_meanings: vec![],
             inflected_stems: vec![],
+            right_test_guesses: vec![],
+            wrong_test_guesses: vec![],
         };
         Arc::new(PreparedWord::new(puzzle, vec![], vec![], vec![]))
     }

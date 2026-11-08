@@ -17,6 +17,7 @@ services:
       TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:?.env dosyasında TURNSTILE_SITE_KEY ayarlanmalı}
       TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:?.env dosyasında TURNSTILE_SECRET_KEY ayarlanmalı}
       TURNSTILE_HOSTNAME: ${TURNSTILE_HOSTNAME:?.env dosyasında TURNSTILE_HOSTNAME ayarlanmalı}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       TEI_URL: http://ai-1:80,http://ai-2:80
       CLIENT_IP_HEADER: X-Real-IP
     volumes:

@@ -19,7 +19,8 @@ use crate::encoder::{EncoderError, TeiEncoder};
 use crate::game::{
     FinishResponse, GAME_SECONDS, GUESS_INTERVAL_SECONDS, Game, GuessCheck, GuessResponse,
     HINT_KINDS, HINT_PENALTY, HintKind, HintResponse, JudgedGuess, MAX_GUESS_LENGTH,
-    MAX_TIME_PENALTY, RevealedHint, game_result, remove_stale_games,
+    MAX_TIME_PENALTY, RevealedHint, WIN_CLOSENESS, game_result, remove_stale_games,
+    wrong_turn_note,
 };
 use crate::players::{PlayerDay, TodaysPlayers, is_valid_player_id};
 use crate::puzzle::Puzzle;
@@ -28,8 +29,9 @@ use crate::rate_limit::{
     GUESS_WINDOW_SECONDS, HINT_LIMIT, HINT_WINDOW_SECONDS, RESULT_LIMIT, RESULT_WINDOW_SECONDS,
     RateLimiter, UNKNOWN_CLIENT, rate_limit_key,
 };
-use crate::similarity::{MeaningJudge, PreparedWord};
+use crate::similarity::{MeaningJudge, PreparedWord, WIN_SIMILARITY};
 use crate::stats::StatsSummary;
+use crate::test_guess_writer::{TestGuessWriter, TestGuesses};
 use crate::turnstile::{HumanCheck, START_GAME_ACTION, TurnstileVerifier};
 
 pub const ADMIN_TOKEN_HEADER: &str = "x-admin-token";
@@ -42,6 +44,7 @@ pub struct AppState {
     pub games: Mutex<HashMap<String, Game>>,
     pub players: Mutex<TodaysPlayers>,
     turnstile: TurnstileVerifier,
+    test_guess_writer: Option<TestGuessWriter>,
     game_start_limiter: Mutex<RateLimiter>,
     guess_limiter: Mutex<RateLimiter>,
     hint_limiter: Mutex<RateLimiter>,
@@ -58,6 +61,13 @@ impl AppState {
             config.turnstile_verify_url.clone(),
             config.turnstile_hostname.clone(),
         );
+        let mut test_guess_writer = None;
+        if let Some(api_key) = &config.anthropic_api_key {
+            test_guess_writer = Some(TestGuessWriter::new(
+                api_key.clone(),
+                config.anthropic_messages_url.clone(),
+            ));
+        }
         AppState {
             config,
             clock,
@@ -66,6 +76,7 @@ impl AppState {
             games: Mutex::new(HashMap::new()),
             players: Mutex::new(TodaysPlayers::new()),
             turnstile,
+            test_guess_writer,
             game_start_limiter: Mutex::new(RateLimiter::new(
                 GAME_START_LIMIT,
                 GAME_START_WINDOW_SECONDS,
@@ -100,6 +111,8 @@ pub enum ApiError {
     InvalidInput(String),
     ModelBusy,
     ServerFailed,
+    WriterDisabled,
+    WriterFailed,
 }
 
 impl From<EncoderError> for ApiError {
@@ -166,6 +179,14 @@ impl IntoResponse for ApiError {
             ApiError::ServerFailed => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Sunucuda bir hata oluştu.".to_string(),
+            ),
+            ApiError::WriterDisabled => (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "Sunucuda ANTHROPIC_API_KEY ayarlanmamış.".to_string(),
+            ),
+            ApiError::WriterFailed => (
+                StatusCode::BAD_GATEWAY,
+                "Deneme tahminleri yazılamadı. Biraz sonra tekrar dene.".to_string(),
             ),
         };
 
@@ -372,30 +393,131 @@ async fn get_word_status(
     Json(word_status(&state))
 }
 
+fn cleaned_upload(upload: Puzzle) -> Result<Puzzle, ApiError> {
+    match upload.cleaned() {
+        Ok(puzzle) => Ok(puzzle),
+        Err(invalid) => Err(ApiError::InvalidInput(format!(
+            "'{}' alanı boş, çok uzun ya da çok kalabalık.",
+            invalid.0
+        ))),
+    }
+}
+
+fn too_long_definition_error() -> ApiError {
+    ApiError::InvalidInput(
+        "Tanımlardan biri modelin okuyabileceğinden uzun. Kısaltıp tekrar dene.".to_string(),
+    )
+}
+
 async fn publish_word(
     _: AdminAccess,
     State(state): State<Arc<AppState>>,
     Json(upload): Json<Puzzle>,
 ) -> Result<Json<WordStatusResponse>, ApiError> {
-    let puzzle = match upload.cleaned() {
-        Ok(puzzle) => puzzle,
-        Err(invalid) => {
-            return Err(ApiError::InvalidInput(format!(
-                "'{}' alanı boş ya da çok uzun.",
-                invalid.0
-            )));
-        }
-    };
+    let puzzle = cleaned_upload(upload)?;
     let published = state
         .word_store
         .publish(puzzle, state.clock.unix_seconds())
         .await;
     match published {
         Ok(()) => Ok(Json(word_status(&state))),
-        Err(StoreError::Encoder(EncoderError::TooLong)) => Err(ApiError::InvalidInput(
-            "Tanımlardan biri modelin okuyabileceğinden uzun. Kısaltıp tekrar dene.".to_string(),
-        )),
+        Err(StoreError::Encoder(EncoderError::TooLong)) => Err(too_long_definition_error()),
         Err(error) => Err(ApiError::from(error)),
+    }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "lowercase")]
+enum ExpectedVerdict {
+    Right,
+    Wrong,
+}
+
+#[derive(Serialize)]
+struct TestGuessResult {
+    text: String,
+    expected: ExpectedVerdict,
+    won: bool,
+    as_expected: bool,
+    closeness: i64,
+    note: Option<&'static str>,
+}
+
+#[derive(Serialize)]
+struct WordCheckResponse {
+    win_similarity: f64,
+    threshold_raised: bool,
+    test_guesses: Vec<TestGuessResult>,
+}
+
+async fn test_guess_result(
+    state: &AppState,
+    word: &PreparedWord,
+    text: &str,
+    expected: ExpectedVerdict,
+) -> Result<TestGuessResult, ApiError> {
+    let judgement = state.judge.evaluate(word, text).await?;
+    let mut closeness = word.closeness_of(judgement.similarity);
+    let mut note = None;
+    if judgement.won {
+        closeness = WIN_CLOSENESS;
+    } else if let Some(wrong_turn) = judgement.wrong_turn {
+        note = Some(wrong_turn_note(wrong_turn));
+    }
+    let as_expected = match expected {
+        ExpectedVerdict::Right => judgement.won,
+        ExpectedVerdict::Wrong => !judgement.won,
+    };
+    Ok(TestGuessResult {
+        text: text.to_string(),
+        expected,
+        won: judgement.won,
+        as_expected,
+        closeness,
+        note,
+    })
+}
+
+async fn check_word(
+    _: AdminAccess,
+    State(state): State<Arc<AppState>>,
+    Json(upload): Json<Puzzle>,
+) -> Result<Json<WordCheckResponse>, ApiError> {
+    let puzzle = cleaned_upload(upload)?;
+    let word = match state.judge.prepare(puzzle).await {
+        Ok(word) => word,
+        Err(EncoderError::TooLong) => return Err(too_long_definition_error()),
+        Err(error) => return Err(ApiError::from(error)),
+    };
+    let mut test_guesses = Vec::new();
+    for text in &word.puzzle.right_test_guesses {
+        test_guesses.push(test_guess_result(&state, &word, text, ExpectedVerdict::Right).await?);
+    }
+    for text in &word.puzzle.wrong_test_guesses {
+        test_guesses.push(test_guess_result(&state, &word, text, ExpectedVerdict::Wrong).await?);
+    }
+    Ok(Json(WordCheckResponse {
+        win_similarity: word.win_similarity(),
+        threshold_raised: word.win_similarity() > WIN_SIMILARITY,
+        test_guesses,
+    }))
+}
+
+async fn write_test_guesses(
+    _: AdminAccess,
+    State(state): State<Arc<AppState>>,
+    Json(upload): Json<Puzzle>,
+) -> Result<Json<TestGuesses>, ApiError> {
+    let puzzle = cleaned_upload(upload)?;
+    let Some(writer) = &state.test_guess_writer else {
+        return Err(ApiError::WriterDisabled);
+    };
+    match writer.write(&puzzle).await {
+        Ok(test_guesses) => Ok(Json(test_guesses)),
+        Err(error) => {
+            eprintln!("Deneme tahminleri yazılamadı: {error}");
+            Err(ApiError::WriterFailed)
+        }
     }
 }
 
@@ -647,6 +769,8 @@ pub fn router(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/api/today", get(get_today))
         .route("/api/admin/word", get(get_word_status).post(publish_word))
+        .route("/api/admin/word/check", post(check_word))
+        .route("/api/admin/word/test-guesses", post(write_test_guesses))
         .route("/api/players/{player_id}/today", get(get_player_today))
         .route("/api/games", post(start_game))
         .route("/api/games/{game_id}/hints", post(reveal_hint))

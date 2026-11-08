@@ -1,5 +1,12 @@
 const TEXT_FIELDS = ["word", "definition", "parts", "sentence", "category", "field"];
-const LIST_FIELDS = ["also_accepted", "opposite_meanings", "wrong_meanings", "inflected_stems"];
+const LIST_FIELDS = [
+  "also_accepted",
+  "opposite_meanings",
+  "wrong_meanings",
+  "inflected_stems",
+  "right_test_guesses",
+  "wrong_test_guesses",
+];
 
 function element(id) {
   return document.getElementById(id);
@@ -28,23 +35,17 @@ function readWordForm() {
 }
 
 async function failureMessage(response) {
-  if (response.status === 401) {
-    return "Parola yanlış.";
-  }
-  if (response.status === 422) {
-    const body = await response.json().catch(() => ({}));
-    return body.detail || "Eksik ya da çok uzun bir alan var.";
-  }
   if (response.status === 429) {
     return `Çok fazla deneme yapıldı. ${response.headers.get("Retry-After")} saniye sonra tekrar dene.`;
   }
-  if (response.status === 503) {
-    return "Sunucuda ADMIN_TOKEN ayarlanmamış.";
+  const body = await response.json().catch(() => ({}));
+  if (body.detail) {
+    return body.detail;
   }
   return `İstek başarısız oldu: ${response.status}`;
 }
 
-async function callAdminApi(method, body) {
+async function callAdminApi(method, path, body) {
   const options = {
     method,
     cache: "no-store",
@@ -57,7 +58,7 @@ async function callAdminApi(method, body) {
 
   let response;
   try {
-    response = await fetch("/api/admin/word", options);
+    response = await fetch(path, options);
   } catch (error) {
     throw new Error("Sunucuya ulaşılamadı.");
   }
@@ -81,7 +82,7 @@ function describeStatus(status) {
 
 async function refreshStatus() {
   try {
-    const status = await callAdminApi("GET");
+    const status = await callAdminApi("GET", "/api/admin/word");
     element("word-status").textContent = describeStatus(status);
   } catch (error) {
     element("word-status").textContent = error.message;
@@ -95,7 +96,7 @@ async function publishWord(event) {
   button.disabled = true;
   message.textContent = "";
   try {
-    const status = await callAdminApi("POST", readWordForm());
+    const status = await callAdminApi("POST", "/api/admin/word", readWordForm());
     element("word-status").textContent = describeStatus(status);
     message.textContent = `${status.word} yayınlandı.`;
   } catch (error) {
@@ -105,5 +106,130 @@ async function publishWord(event) {
   }
 }
 
+function fieldLines(name) {
+  return linesOf(element("word-form").elements[name].value);
+}
+
+function setFieldLines(name, lines) {
+  element("word-form").elements[name].value = lines.join("\n");
+}
+
+function addLines(name, newLines) {
+  const lines = fieldLines(name);
+  for (const line of newLines) {
+    if (!lines.includes(line)) {
+      lines.push(line);
+    }
+  }
+  setFieldLines(name, lines);
+}
+
+function moveLine(text, fromName, toName) {
+  setFieldLines(fromName, fieldLines(fromName).filter((line) => line !== text));
+  addLines(toName, [text]);
+}
+
+async function runWithButton(buttonId, work) {
+  const button = element(buttonId);
+  const message = element("check-message");
+  button.disabled = true;
+  message.textContent = "";
+  try {
+    await work(message);
+  } catch (error) {
+    message.textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
+}
+
+function writeTestGuesses() {
+  return runWithButton("write-tests-button", async (message) => {
+    message.textContent = "Yazılıyor, bir dakika kadar sürebilir…";
+    const written = await callAdminApi("POST", "/api/admin/word/test-guesses", readWordForm());
+    addLines("right_test_guesses", written.right);
+    addLines("wrong_test_guesses", written.wrong);
+    message.textContent = `${written.right.length + written.wrong.length} deneme tahmini eklendi. Gözden geçirip Dene'ye bas.`;
+  });
+}
+
+function countWins(results, expected) {
+  const matching = results.filter((result) => result.expected === expected);
+  const wins = matching.filter((result) => result.won).length;
+  return `${wins}/${matching.length}`;
+}
+
+function summaryText(report) {
+  const results = report.test_guesses;
+  let text = `Kazanması gerekenlerden ${countWins(results, "right")} kazandı. Kazanmaması gerekenlerden ${countWins(results, "wrong")} kazandı.`;
+  if (report.threshold_raised) {
+    const threshold = report.win_similarity.toLocaleString("tr-TR", { maximumFractionDigits: 3 });
+    text += ` Bir yanlış deneme tahmini eşiği geçtiği için bu sözcüğün kazanma eşiği ${threshold} oldu, doğru tahminler de zorlaşır. O tahmini yanlış anlamlara taşımak daha iyi.`;
+  }
+  return text;
+}
+
+function buildMoveButton(result) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "check-move";
+  if (result.expected === "right") {
+    button.textContent = "Doğru anlatımlara taşı";
+    button.addEventListener("click", () => {
+      moveLine(result.text, "right_test_guesses", "also_accepted");
+      button.replaceWith("Taşındı");
+    });
+  } else {
+    button.textContent = "Yanlış anlamlara taşı";
+    button.addEventListener("click", () => {
+      moveLine(result.text, "wrong_test_guesses", "wrong_meanings");
+      button.replaceWith("Taşındı");
+    });
+  }
+  return button;
+}
+
+function buildReportRow(result) {
+  const row = document.createElement("li");
+  row.className = result.as_expected ? "check-row" : "check-row check-row-off";
+
+  const mark = document.createElement("span");
+  mark.className = "check-mark";
+  mark.textContent = result.as_expected ? "✓" : "✗";
+
+  const text = document.createElement("span");
+  text.className = "check-text";
+  text.textContent = result.text;
+
+  const verdict = document.createElement("span");
+  verdict.className = "check-verdict";
+  verdict.textContent = result.won ? "kazandı" : `%${result.closeness}`;
+  if (result.note) {
+    verdict.textContent += ` · ${result.note}`;
+  }
+
+  row.append(mark, text, verdict);
+  if (!result.as_expected) {
+    row.append(buildMoveButton(result));
+  }
+  return row;
+}
+
+function checkWord() {
+  return runWithButton("check-button", async (message) => {
+    message.textContent = "Deneniyor…";
+    const report = await callAdminApi("POST", "/api/admin/word/check", readWordForm());
+    const misjudged = report.test_guesses.filter((result) => !result.as_expected);
+    misjudged.sort((first, second) => first.expected.localeCompare(second.expected));
+    const judgedWell = report.test_guesses.filter((result) => result.as_expected);
+    element("check-summary").textContent = summaryText(report);
+    element("check-list").replaceChildren(...[...misjudged, ...judgedWell].map(buildReportRow));
+    element("check-report").hidden = false;
+    message.textContent = "";
+  });
+}
+
 element("admin-token").addEventListener("change", refreshStatus);
+element("write-tests-button").addEventListener("click", writeTestGuesses);
+element("check-button").addEventListener("click", checkWord);
 element("word-form").addEventListener("submit", publishWord);

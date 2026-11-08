@@ -9,6 +9,7 @@ use crate::turnstile::SITEVERIFY_URL;
 const DEFAULT_BIND_ADDRESS: &str = "0.0.0.0:8000";
 const DEFAULT_TEI_URL: &str = "http://127.0.0.1:8080";
 const DEFAULT_WORD_FILE: &str = "data/current_word.json";
+pub const ANTHROPIC_MESSAGES_URL: &str = "https://api.anthropic.com/v1/messages";
 
 pub struct Config {
     pub bind_address: String,
@@ -20,6 +21,8 @@ pub struct Config {
     pub turnstile_secret_key: String,
     pub turnstile_hostname: String,
     pub turnstile_verify_url: String,
+    pub anthropic_api_key: Option<String>,
+    pub anthropic_messages_url: String,
 }
 
 fn variable(name: &str) -> Option<String> {
@@ -57,6 +60,8 @@ impl Config {
             turnstile_secret_key: required_variable("TURNSTILE_SECRET_KEY"),
             turnstile_hostname: required_variable("TURNSTILE_HOSTNAME"),
             turnstile_verify_url: SITEVERIFY_URL.to_string(),
+            anthropic_api_key: variable("ANTHROPIC_API_KEY"),
+            anthropic_messages_url: ANTHROPIC_MESSAGES_URL.to_string(),
         }
     }
 }

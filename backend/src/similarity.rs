@@ -11,9 +11,11 @@ pub const ZERO_CLOSENESS_SIMILARITY: f64 = 0.15;
 pub const HIGHEST_CLOSENESS_WITHOUT_WIN: i64 = 99;
 pub const GUESS_CACHE_SIZE: u64 = 1000;
 pub const WRONG_TURN_FLOOR: f64 = 0.4;
+pub const TEST_GUESS_MARGIN: f64 = 0.02;
+pub const HIGHEST_WIN_SIMILARITY: f64 = 0.70;
 
-pub fn closeness_percent(similarity: f64) -> i64 {
-    let similarity_range = WIN_SIMILARITY - ZERO_CLOSENESS_SIMILARITY;
+pub fn closeness_percent(similarity: f64, win_similarity: f64) -> i64 {
+    let similarity_range = win_similarity - ZERO_CLOSENESS_SIMILARITY;
     let percent = ((similarity - ZERO_CLOSENESS_SIMILARITY) / similarity_range * 100.0)
         .round_ties_even() as i64;
     percent.clamp(0, HIGHEST_CLOSENESS_WITHOUT_WIN)
@@ -51,11 +53,20 @@ fn wrong_turn_of(
     None
 }
 
+pub fn win_similarity_for(wrong_test_similarities: &[f64]) -> f64 {
+    let mut win_similarity = WIN_SIMILARITY;
+    for similarity in wrong_test_similarities {
+        win_similarity = win_similarity.max(similarity + TEST_GUESS_MARGIN);
+    }
+    win_similarity.min(HIGHEST_WIN_SIMILARITY)
+}
+
 pub struct PreparedWord {
     pub puzzle: Puzzle,
     right_vectors: Vec<Vec<f32>>,
     opposite_vectors: Vec<Vec<f32>>,
     other_meaning_vectors: Vec<Vec<f32>>,
+    win_similarity: f64,
 }
 
 impl PreparedWord {
@@ -70,7 +81,16 @@ impl PreparedWord {
             right_vectors,
             opposite_vectors,
             other_meaning_vectors,
+            win_similarity: WIN_SIMILARITY,
         }
+    }
+
+    pub fn win_similarity(&self) -> f64 {
+        self.win_similarity
+    }
+
+    pub fn closeness_of(&self, similarity: f64) -> i64 {
+        closeness_percent(similarity, self.win_similarity)
     }
 
     pub fn compare(&self, guess_vector: &[f32]) -> Judgement {
@@ -85,7 +105,7 @@ impl PreparedWord {
         }
         Judgement {
             similarity,
-            won: similarity >= WIN_SIMILARITY,
+            won: similarity >= self.win_similarity,
             wrong_turn: wrong_turn_of(closest_right, closest_opposite, closest_other_meaning),
         }
     }
@@ -130,6 +150,14 @@ impl MeaningJudge {
         self.encoder.encode(&normalized_texts).await
     }
 
+    async fn encode_guesses(&self, guesses: &[String]) -> Result<Vec<Vec<f32>>, EncoderError> {
+        let mut normalized_guesses = Vec::new();
+        for guess in guesses {
+            normalized_guesses.push(self.letters.normalize_guess(guess));
+        }
+        self.encoder.encode(&normalized_guesses).await
+    }
+
     async fn encode_guess_without_cache(
         &self,
         normalized_guess: String,
@@ -161,12 +189,20 @@ impl MeaningJudge {
 
         let opposite_vectors = self.encode_all(&puzzle.opposite_meanings).await?;
         let other_meaning_vectors = self.encode_all(&puzzle.wrong_meanings).await?;
-        Ok(PreparedWord::new(
+        let mut word = PreparedWord::new(
             puzzle,
             right_vectors,
             opposite_vectors,
             other_meaning_vectors,
-        ))
+        );
+
+        let wrong_test_vectors = self.encode_guesses(&word.puzzle.wrong_test_guesses).await?;
+        let mut wrong_test_similarities = Vec::new();
+        for vector in &wrong_test_vectors {
+            wrong_test_similarities.push(word.compare(vector).similarity);
+        }
+        word.win_similarity = win_similarity_for(&wrong_test_similarities);
+        Ok(word)
     }
 
     pub async fn evaluate(
@@ -201,17 +237,47 @@ mod tests {
             opposite_meanings: vec![],
             wrong_meanings: vec![],
             inflected_stems: vec![],
+            right_test_guesses: vec![],
+            wrong_test_guesses: vec![],
         }
     }
 
     #[test]
     fn closeness_never_shows_a_win_below_threshold() {
-        assert_eq!(closeness_percent(WIN_SIMILARITY - 0.0001), 99);
+        assert_eq!(
+            closeness_percent(WIN_SIMILARITY - 0.0001, WIN_SIMILARITY),
+            99
+        );
     }
 
     #[test]
     fn closeness_never_goes_below_zero() {
-        assert_eq!(closeness_percent(-0.5), 0);
+        assert_eq!(closeness_percent(-0.5, WIN_SIMILARITY), 0);
+    }
+
+    #[test]
+    fn threshold_stays_when_wrong_test_guesses_score_low() {
+        assert_eq!(win_similarity_for(&[0.2, 0.5]), WIN_SIMILARITY);
+        assert_eq!(win_similarity_for(&[]), WIN_SIMILARITY);
+    }
+
+    #[test]
+    fn threshold_rises_above_a_wrong_test_guess_that_would_win() {
+        let win_similarity = win_similarity_for(&[0.3, 0.64]);
+        assert!((win_similarity - 0.66).abs() < 1e-9);
+    }
+
+    #[test]
+    fn threshold_never_rises_past_the_ceiling() {
+        assert_eq!(win_similarity_for(&[0.95]), HIGHEST_WIN_SIMILARITY);
+    }
+
+    #[test]
+    fn raised_threshold_decides_the_win() {
+        let mut word = PreparedWord::new(puzzle(), vec![vec![1.0, 0.0]], vec![], vec![]);
+        word.win_similarity = 0.66;
+        assert!(!word.compare(&[0.64, 0.768]).won);
+        assert!(word.compare(&[0.8, 0.6]).won);
     }
 
     #[test]
