@@ -8,3 +8,4 @@ pub mod puzzle;
 pub mod rate_limit;
 pub mod similarity;
 pub mod text;
+pub mod turnstile;

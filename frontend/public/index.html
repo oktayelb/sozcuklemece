@@ -14,6 +14,7 @@
       <p class="logo-gloss"><em>isim.</em> Daha önce hiç duyulmamış bir sözcüğün anlamını üç dakikada bulma oyunu.</p>
       <div class="play-area">
         <button id="play-button" class="button button-play" type="button" hidden>Oyna</button>
+        <div id="human-check" class="human-check"></div>
       </div>
       <p id="error-banner" class="error-banner" role="alert" hidden></p>
       <p id="today-date" class="today-date"></p>
@@ -62,6 +63,7 @@
     </section>
 
   </main>
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
   <script src="app.js"></script>
 </body>
 </html>

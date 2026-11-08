@@ -7,7 +7,10 @@ use sozcuklemece_backend::clock::Clock;
 use sozcuklemece_backend::daily_word::WORD_TTL_SECONDS;
 use sozcuklemece_backend::game::{GAME_RESULT_GRACE_SECONDS, GAME_SECONDS, GUESS_INTERVAL_SECONDS};
 use sozcuklemece_backend::rate_limit::{ADMIN_LIMIT, GUESS_LIMIT, GUESS_WINDOW_SECONDS};
-use support::{ADMIN_TOKEN, FakeTeiMode, TestServer, first_puzzle, game_day_noon, second_puzzle};
+use support::{
+    ADMIN_TOKEN, FakeTeiMode, FakeTurnstileMode, PLAYER_IP, TURNSTILE_SITE_KEY, TestServer,
+    VALID_TURNSTILE_TOKEN, first_puzzle, game_day_noon, second_puzzle,
+};
 
 const UNKNOWN_GUESS: &str = "bambaşka bir açıklama";
 
@@ -32,7 +35,11 @@ async fn today_reports_date_and_a_ready_word() {
     let server = TestServer::with_word().await;
     assert_eq!(
         server.get("/api/today").await.body,
-        json!({ "date": "2026-11-06", "word_available": true })
+        json!({
+            "date": "2026-11-06",
+            "word_available": true,
+            "turnstile_site_key": TURNSTILE_SITE_KEY,
+        })
     );
 }
 
@@ -62,7 +69,10 @@ async fn start_gives_word_and_hint_names_without_hint_contents() {
 async fn start_without_a_word_is_not_found() {
     let server = TestServer::empty().await;
     assert_eq!(
-        server.post("/api/games", json!({})).await.status,
+        server
+            .start_game_with_token(VALID_TURNSTILE_TOKEN)
+            .await
+            .status,
         StatusCode::NOT_FOUND
     );
 }
@@ -203,7 +213,10 @@ async fn word_is_gone_after_a_day() {
     server.advance_clock(WORD_TTL_SECONDS);
     assert_eq!(server.get("/api/today").await.body["word_available"], false);
     assert_eq!(
-        server.post("/api/games", json!({})).await.status,
+        server
+            .start_game_with_token(VALID_TURNSTILE_TOKEN)
+            .await
+            .status,
         StatusCode::NOT_FOUND
     );
 }
@@ -439,16 +452,10 @@ async fn wrong_password_is_refused_before_the_body_is_judged() {
 
 #[tokio::test]
 async fn admin_stays_closed_when_no_password_is_configured() {
-    let tei = std::sync::Arc::new(support::FakeTei::start().await);
-    let data_directory = std::sync::Arc::new(tempfile::TempDir::new().unwrap());
-    let server = TestServer::build(
-        tei,
-        data_directory,
-        Clock::manual(game_day_noon()),
-        |config| {
-            config.admin_token = None;
-        },
-    );
+    let server = TestServer::empty_with(|config| {
+        config.admin_token = None;
+    })
+    .await;
     let puzzle = serde_json::to_value(second_puzzle()).unwrap();
     assert_eq!(
         server.publish_with_token(&puzzle, Some("")).await.status,
@@ -694,4 +701,62 @@ async fn each_game_waits_on_its_own() {
         server.guess(&second_game_id, UNKNOWN_GUESS).await.status,
         StatusCode::OK
     );
+}
+
+#[tokio::test]
+async fn today_gives_the_turnstile_site_key() {
+    let server = TestServer::with_word().await;
+    assert_eq!(
+        server.get("/api/today").await.body["turnstile_site_key"],
+        TURNSTILE_SITE_KEY
+    );
+}
+
+#[tokio::test]
+async fn start_needs_a_turnstile_token() {
+    let server = TestServer::with_word().await;
+    let response = server.post("/api/games", json!({})).await;
+    assert_eq!(response.status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert!(server.state.games.lock().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn start_with_a_failed_human_check_is_forbidden() {
+    let server = TestServer::with_word().await;
+    for token in ["", "sahte-jeton"] {
+        let response = server.start_game_with_token(token).await;
+        assert_eq!(response.status, StatusCode::FORBIDDEN, "{token}");
+    }
+    assert!(server.state.games.lock().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn empty_token_is_refused_without_asking_cloudflare() {
+    let server = TestServer::with_word().await;
+    server.start_game_with_token("").await;
+    assert!(server.turnstile.requests().is_empty());
+}
+
+#[tokio::test]
+async fn turnstile_is_told_the_player_ip() {
+    let server = TestServer::with_word().await;
+    server.start_game().await;
+    let requests = server.turnstile.requests();
+    assert_eq!(requests.len(), 1);
+    assert_eq!(requests[0].remoteip.as_deref(), Some(PLAYER_IP));
+}
+
+#[tokio::test]
+async fn unreachable_turnstile_asks_the_player_to_wait() {
+    let server = TestServer::with_word().await;
+    server.turnstile.set_mode(FakeTurnstileMode::Down);
+    let response = server.start_game_with_token(VALID_TURNSTILE_TOKEN).await;
+    assert_eq!(response.status, StatusCode::SERVICE_UNAVAILABLE);
+}
+
+#[tokio::test]
+async fn turnstile_is_not_asked_when_there_is_no_word() {
+    let server = TestServer::empty().await;
+    server.start_game_with_token(VALID_TURNSTILE_TOKEN).await;
+    assert!(server.turnstile.requests().is_empty());
 }

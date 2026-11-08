@@ -170,6 +170,12 @@ p {
   margin-top: 3rem;
 }
 
+.human-check {
+  display: flex;
+  justify-content: center;
+  margin-top: 1rem;
+}
+
 .today-date {
   margin-top: 1.8rem;
   color: var(--ink-soft);

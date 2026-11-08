@@ -27,7 +27,10 @@ Burada aynı zamanda çokça kullanıcının siteye gireceği kalabalık zamanla
 
 ## Çalıştırma
 
-    ADMIN_TOKEN=uzun-rastgele-bir-parola docker compose up -d --build
+    export ADMIN_TOKEN=uzun-rastgele-bir-parola
+    export TURNSTILE_SITE_KEY=1x00000000000000000000AA
+    export TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA
+    docker compose up -d --build
 
 Ardından http://127.0.0.1:8000 adresini aç. İlk derleme modeli indirip ONNX'e çevirdiği için birkaç dakika sürer. Günün sözcüğü `word-data` biriminde durur, yeniden başlatmada kaybolmaz.
 
@@ -36,11 +39,17 @@ Arka ucu kapsayıcı dışında çalıştırmak için:
     docker compose build ai
     docker run --rm -p 127.0.0.1:8080:80 sozcuklemece-ai
     cd backend
-    ADMIN_TOKEN=uzun-rastgele-bir-parola cargo run --release
+    cargo run --release
 
 Arka uç `TEI_URL` (varsayılan `http://127.0.0.1:8080`), `BIND_ADDRESS` (varsayılan `0.0.0.0:8000`) ve `WORD_FILE` (varsayılan `data/current_word.json`) ortam değişkenlerini okur.
 
 Testler: `cd backend && cargo test`
+
+## İnsan doğrulaması
+
+Oyun başlatılırken Cloudflare Turnstile ile doğrulama yapılır. Görünmez çalışır, oyuncuya kutucuk yalnızca Cloudflare şüphelenirse gösterilir. Turnstile jetonu tek kullanımlık ve her doğrulama Cloudflare'e bir istek olduğu için doğrulama her tahminde değil oyun başında yapılır. Sonraki istekler tahmin edilemeyen oyun kimliğine ve oyun başı bekleme süresine bağlıdır.
+
+`TURNSTILE_SITE_KEY` ve `TURNSTILE_SECRET_KEY` zorunludur ve Cloudflare panelinden alınır. Yukarıdaki değerler Cloudflare'in her zaman geçen test anahtarlarıdır, yalnızca yerelde kullan. Cloudflare'e ulaşılamazsa oyun başlatılamaz (503).
 
 ## Önbellek ve CDN
 

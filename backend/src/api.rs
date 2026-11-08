@@ -26,6 +26,7 @@ use crate::rate_limit::{
     GUESS_WINDOW_SECONDS, RateLimiter, UNKNOWN_CLIENT, rate_limit_key,
 };
 use crate::similarity::MeaningJudge;
+use crate::turnstile::{HumanCheck, TurnstileVerifier};
 
 pub const ADMIN_TOKEN_HEADER: &str = "x-admin-token";
 
@@ -35,6 +36,7 @@ pub struct AppState {
     pub judge: Arc<MeaningJudge>,
     pub word_store: DailyWordStore,
     pub games: Mutex<HashMap<String, Game>>,
+    turnstile: TurnstileVerifier,
     game_start_limiter: Mutex<RateLimiter>,
     guess_limiter: Mutex<RateLimiter>,
     admin_limiter: Mutex<RateLimiter>,
@@ -44,12 +46,17 @@ impl AppState {
     pub fn new(config: Config, clock: Clock) -> AppState {
         let judge = Arc::new(MeaningJudge::new(TeiEncoder::new(&config.tei_url)));
         let word_store = DailyWordStore::new(judge.clone(), config.word_file.clone());
+        let turnstile = TurnstileVerifier::new(
+            config.turnstile_secret_key.clone(),
+            config.turnstile_verify_url.clone(),
+        );
         AppState {
             config,
             clock,
             judge,
             word_store,
             games: Mutex::new(HashMap::new()),
+            turnstile,
             game_start_limiter: Mutex::new(RateLimiter::new(
                 GAME_START_LIMIT,
                 GAME_START_WINDOW_SECONDS,
@@ -72,6 +79,8 @@ pub enum ApiError {
     TooManyRequests { seconds_to_wait: f64 },
     AdminDisabled,
     WrongPassword,
+    HumanCheckFailed,
+    HumanCheckUnavailable,
     InvalidInput(String),
     ModelBusy,
     ServerFailed,
@@ -118,6 +127,14 @@ impl IntoResponse for ApiError {
                 "Sunucuda ADMIN_TOKEN ayarlanmamış.".to_string(),
             ),
             ApiError::WrongPassword => (StatusCode::UNAUTHORIZED, "Parola yanlış.".to_string()),
+            ApiError::HumanCheckFailed => (
+                StatusCode::FORBIDDEN,
+                "İnsan doğrulaması geçilemedi.".to_string(),
+            ),
+            ApiError::HumanCheckUnavailable => (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "İnsan doğrulaması şu an yapılamıyor. Biraz bekleyip tekrar dene.".to_string(),
+            ),
             ApiError::InvalidInput(detail) => (StatusCode::UNPROCESSABLE_ENTITY, detail.clone()),
             ApiError::ModelBusy => (
                 StatusCode::SERVICE_UNAVAILABLE,
@@ -169,19 +186,33 @@ fn enforce_rate_limit(
     Ok(())
 }
 
-pub struct ClientKey(String);
+pub struct Client {
+    host: String,
+    rate_limit_key: String,
+}
 
-impl FromRequestParts<Arc<AppState>> for ClientKey {
+impl Client {
+    fn known_ip(&self) -> Option<&str> {
+        if self.host == UNKNOWN_CLIENT {
+            return None;
+        }
+        Some(&self.host)
+    }
+}
+
+impl FromRequestParts<Arc<AppState>> for Client {
     type Rejection = ApiError;
 
     async fn from_request_parts(
         parts: &mut Parts,
         state: &Arc<AppState>,
-    ) -> Result<ClientKey, ApiError> {
-        Ok(ClientKey(rate_limit_key(&client_host(
-            parts,
-            &state.config,
-        ))))
+    ) -> Result<Client, ApiError> {
+        let host = client_host(parts, &state.config);
+        let rate_limit_key = rate_limit_key(&host);
+        Ok(Client {
+            host,
+            rate_limit_key,
+        })
     }
 }
 
@@ -220,6 +251,7 @@ impl FromRequestParts<Arc<AppState>> for AdminAccess {
 struct TodayResponse {
     date: String,
     word_available: bool,
+    turnstile_site_key: String,
 }
 
 #[derive(Serialize)]
@@ -244,6 +276,11 @@ struct StartResponse {
     guess_interval_seconds: f64,
     remaining_seconds: f64,
     score: i64,
+}
+
+#[derive(Deserialize)]
+struct StartRequest {
+    turnstile_token: String,
 }
 
 #[derive(Deserialize)]
@@ -274,6 +311,7 @@ async fn get_today(State(state): State<Arc<AppState>>) -> Json<TodayResponse> {
     Json(TodayResponse {
         date: game_day(now).to_string(),
         word_available: state.word_store.current_word(now).is_some(),
+        turnstile_site_key: state.config.turnstile_site_key.clone(),
     })
 }
 
@@ -307,16 +345,26 @@ async fn publish_word(
 
 async fn start_game(
     State(state): State<Arc<AppState>>,
-    client: ClientKey,
+    client: Client,
+    Json(body): Json<StartRequest>,
 ) -> Result<Json<StartResponse>, ApiError> {
     enforce_rate_limit(
         &state.game_start_limiter,
-        &client.0,
+        &client.rate_limit_key,
         state.clock.monotonic_seconds(),
     )?;
     let Some(live) = state.word_store.current_word(state.clock.unix_seconds()) else {
         return Err(ApiError::WordNotReady);
     };
+    match state
+        .turnstile
+        .verify(&body.turnstile_token, client.known_ip())
+        .await
+    {
+        HumanCheck::Passed => {}
+        HumanCheck::Failed => return Err(ApiError::HumanCheckFailed),
+        HumanCheck::Unavailable => return Err(ApiError::HumanCheckUnavailable),
+    }
 
     let now = state.clock.monotonic_seconds();
     let game = Game::new(live.word, now);
@@ -356,7 +404,7 @@ async fn reveal_hint(
 
 async fn submit_guess(
     State(state): State<Arc<AppState>>,
-    client: ClientKey,
+    client: Client,
     Path(game_id): Path<String>,
     Json(body): Json<GuessRequest>,
 ) -> Result<Json<GuessResponse>, ApiError> {
@@ -368,7 +416,7 @@ async fn submit_guess(
     }
     enforce_rate_limit(
         &state.guess_limiter,
-        &client.0,
+        &client.rate_limit_key,
         state.clock.monotonic_seconds(),
     )?;
 

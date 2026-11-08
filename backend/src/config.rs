@@ -1,7 +1,10 @@
 use std::env;
 use std::path::PathBuf;
+use std::process;
 
 use axum::http::HeaderName;
+
+use crate::turnstile::SITEVERIFY_URL;
 
 const DEFAULT_BIND_ADDRESS: &str = "0.0.0.0:8000";
 const DEFAULT_TEI_URL: &str = "http://127.0.0.1:8080";
@@ -13,12 +16,25 @@ pub struct Config {
     pub word_file: PathBuf,
     pub admin_token: Option<String>,
     pub client_ip_header: Option<HeaderName>,
+    pub turnstile_site_key: String,
+    pub turnstile_secret_key: String,
+    pub turnstile_verify_url: String,
 }
 
 fn variable(name: &str) -> Option<String> {
     match env::var(name) {
         Ok(value) if !value.trim().is_empty() => Some(value),
         _ => None,
+    }
+}
+
+fn required_variable(name: &str) -> String {
+    match variable(name) {
+        Some(value) => value,
+        None => {
+            eprintln!("{name} ortam değişkeni ayarlanmalı.");
+            process::exit(1);
+        }
     }
 }
 
@@ -36,6 +52,9 @@ impl Config {
             ),
             admin_token: variable("ADMIN_TOKEN"),
             client_ip_header,
+            turnstile_site_key: required_variable("TURNSTILE_SITE_KEY"),
+            turnstile_secret_key: required_variable("TURNSTILE_SECRET_KEY"),
+            turnstile_verify_url: SITEVERIFY_URL.to_string(),
         }
     }
 }

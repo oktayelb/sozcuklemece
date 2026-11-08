@@ -16,6 +16,8 @@ const game = {
   isSubmitting: false,
 };
 
+let turnstileSiteKey = null;
+
 const pencilSounds = PENCIL_SOUND_FILES.map(loadSound);
 let nextPencilSound = 0;
 
@@ -77,13 +79,45 @@ async function callApi(path, body) {
   if (response.status === 429) {
     throw new RateLimitError(Number(response.headers.get("Retry-After")));
   }
+  if (response.status === 403) {
+    throw new HumanCheckError("İnsan doğrulaması geçilemedi.");
+  }
   if (!response.ok) {
     throw new Error(`İstek başarısız oldu: ${response.status}`);
   }
   return response.json();
 }
 
+class HumanCheckError extends Error {}
+
+function requestHumanCheckToken() {
+  return new Promise((resolve, reject) => {
+    if (typeof turnstile === "undefined" || turnstileSiteKey === null) {
+      reject(new HumanCheckError("Turnstile yüklenemedi."));
+      return;
+    }
+    let widgetId = null;
+    const finish = (settle) => {
+      if (widgetId !== null) {
+        turnstile.remove(widgetId);
+      }
+      settle();
+    };
+    widgetId = turnstile.render("#human-check", {
+      sitekey: turnstileSiteKey,
+      appearance: "interaction-only",
+      language: "tr",
+      callback: (token) => finish(() => resolve(token)),
+      "error-callback": () => finish(() => reject(new HumanCheckError("Turnstile doğrulaması başarısız."))),
+      "timeout-callback": () => finish(() => reject(new HumanCheckError("Turnstile doğrulaması zaman aşımına uğradı."))),
+    });
+  });
+}
+
 function requestFailureMessage(error, fallbackMessage) {
+  if (error instanceof HumanCheckError) {
+    return "İnsan doğrulaması yapılamadı. Sayfayı yenileyip tekrar dene.";
+  }
   if (error instanceof RateLimitError) {
     return `Çok fazla istek gönderildi. ${error.retryAfterSeconds} saniye sonra tekrar dene.`;
   }
@@ -109,6 +143,7 @@ async function loadLandingPage() {
   try {
     const today = await callApi("/api/today");
     element("today-date").textContent = formatDate(today.date);
+    turnstileSiteKey = today.turnstile_site_key;
     if (today.word_available) {
       element("play-button").hidden = false;
     } else {
@@ -272,7 +307,8 @@ async function startGame() {
   game.isStarting = true;
   clearError();
   try {
-    const started = await callApi("/api/games", {});
+    const turnstileToken = await requestHumanCheckToken();
+    const started = await callApi("/api/games", { turnstile_token: turnstileToken });
 
     game.id = started.game_id;
     game.durationSeconds = started.duration_seconds;
