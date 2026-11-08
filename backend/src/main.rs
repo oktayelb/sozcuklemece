@@ -1,4 +1,5 @@
-use std::net::SocketAddr;
+use std::env;
+use std::net::{Ipv4Addr, SocketAddr, TcpStream};
 use std::process;
 use std::sync::Arc;
 use std::time::Duration;
@@ -11,6 +12,19 @@ use sozcuklemece_backend::clock::Clock;
 use sozcuklemece_backend::config::Config;
 
 const CLEANUP_INTERVAL: Duration = Duration::from_secs(60);
+const HEALTH_CHECK_TIMEOUT: Duration = Duration::from_secs(2);
+
+fn check_health(bind_address: &str) -> ! {
+    let port = match bind_address.parse::<SocketAddr>() {
+        Ok(address) => address.port(),
+        Err(_) => process::exit(1),
+    };
+    let local_address = SocketAddr::from((Ipv4Addr::LOCALHOST, port));
+    match TcpStream::connect_timeout(&local_address, HEALTH_CHECK_TIMEOUT) {
+        Ok(_) => process::exit(0),
+        Err(_) => process::exit(1),
+    }
+}
 
 async fn clean_up_periodically(state: Arc<AppState>) {
     let mut interval = tokio::time::interval(CLEANUP_INTERVAL);
@@ -32,6 +46,9 @@ async fn shutdown_signal() {
 async fn main() {
     let config = Config::from_environment();
     let bind_address = config.bind_address.clone();
+    if env::args().nth(1).as_deref() == Some("healthcheck") {
+        check_health(&bind_address);
+    }
     let state = Arc::new(AppState::new(config, Clock::system()));
 
     if let Err(error) = state

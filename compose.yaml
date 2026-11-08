@@ -5,16 +5,17 @@ services:
     ports:
       - "8000:8080"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     restart: unless-stopped
 
   backend:
     build: ./backend
     image: sozcuklemece-backend
     environment:
-      ADMIN_TOKEN: ${ADMIN_TOKEN:?ADMIN_TOKEN ayarlanmalı}
-      TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:?TURNSTILE_SITE_KEY ayarlanmalı}
-      TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:?TURNSTILE_SECRET_KEY ayarlanmalı}
+      ADMIN_TOKEN: ${ADMIN_TOKEN:?.env dosyasında ADMIN_TOKEN ayarlanmalı}
+      TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:?.env dosyasında TURNSTILE_SITE_KEY ayarlanmalı}
+      TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:?.env dosyasında TURNSTILE_SECRET_KEY ayarlanmalı}
       TEI_URL: http://ai:80
       CLIENT_IP_HEADER: X-Real-IP
     volumes:
@@ -22,6 +23,11 @@ services:
     depends_on:
       ai:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/sozcuklemece-backend", "healthcheck"]
+      interval: 5s
+      timeout: 3s
+      start_period: 30s
     restart: unless-stopped
 
   ai:
@@ -29,8 +35,8 @@ services:
     image: sozcuklemece-ai
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost/health"]
-      interval: 10s
-      timeout: 5s
+      interval: 5s
+      timeout: 3s
       start_period: 60s
     restart: unless-stopped
 
