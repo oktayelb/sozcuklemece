@@ -1,0 +1,36 @@
+services:
+  frontend:
+    build: ./frontend
+    image: sozcuklemece-frontend
+    ports:
+      - "8000:8080"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    image: sozcuklemece-backend
+    environment:
+      ADMIN_TOKEN: ${ADMIN_TOKEN:?ADMIN_TOKEN ayarlanmalı}
+      TEI_URL: http://ai:80
+      CLIENT_IP_HEADER: X-Real-IP
+    volumes:
+      - word-data:/app/data
+    depends_on:
+      ai:
+        condition: service_healthy
+    restart: unless-stopped
+
+  ai:
+    build: ./ai
+    image: sozcuklemece-ai
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost/health"]
+      interval: 10s
+      timeout: 5s
+      start_period: 60s
+    restart: unless-stopped
+
+volumes:
+  word-data:

@@ -17,17 +17,34 @@ Burada aynı zamanda çokça kullanıcının siteye gireceği kalabalık zamanla
  FastAPI ile yapmanın iyi olacağını düşünüyorum, üyelik gerekmiyor ve yz kullanacağız, bu yüzden hız çok önemli.
  
 
+## Mimari
+
+Üç kapsayıcı:
+
+- `frontend`: nginx. Statik dosyaları sunar, `/api/` isteklerini arka uca iletir. Dışarıya açık tek kapsayıcı budur.
+- `backend`: Rust arka uç. Oyunlar, puanlar, istek sınırı ve günün sözcüğü burada.
+- `ai`: [text-embeddings-inference](https://github.com/huggingface/text-embeddings-inference) (TEI). Modeli ONNX olarak çalıştırır, gelen istekleri kuyruğa alıp toplu işler. Model imaja gömülüdür, açılışta internete çıkmaz.
+
 ## Çalıştırma
 
-Arka uç Rust ile yazıldı, modeli [text-embeddings-inference](https://github.com/huggingface/text-embeddings-inference) (TEI) çalıştırır.
+    ADMIN_TOKEN=uzun-rastgele-bir-parola docker compose up -d --build
 
-    docker run --rm -p 127.0.0.1:8080:80 ghcr.io/huggingface/text-embeddings-inference:cpu-1.9 --model-id emrecan/bert-base-turkish-cased-mean-nli-stsb-tr
+Ardından http://127.0.0.1:8000 adresini aç. İlk derleme modeli indirip ONNX'e çevirdiği için birkaç dakika sürer. Günün sözcüğü `word-data` biriminde durur, yeniden başlatmada kaybolmaz.
+
+Arka ucu kapsayıcı dışında çalıştırmak için:
+
+    docker compose build ai
+    docker run --rm -p 127.0.0.1:8080:80 sozcuklemece-ai
     cd backend
     ADMIN_TOKEN=uzun-rastgele-bir-parola cargo run --release
 
 Arka uç `TEI_URL` (varsayılan `http://127.0.0.1:8080`), `BIND_ADDRESS` (varsayılan `0.0.0.0:8000`) ve `WORD_FILE` (varsayılan `data/current_word.json`) ortam değişkenlerini okur.
 
 Testler: `cd backend && cargo test`
+
+## Önbellek ve CDN
+
+nginx ön yüz dosyalarını önbellek başlıklarıyla sunar: HTML, JS ve CSS 5 dakika, yazı tipleri ve sesler 30 gün. `/api/` yanıtları hiç önbelleğe alınmaz. Önüne bir CDN (ör. Cloudflare) konursa nginx'e `set_real_ip_from` ve `real_ip_header` eklenmeli, yoksa bütün oyuncular CDN'in IP'si sayılır.
 
 ## Günün sözcüğünü yükleme
 
@@ -49,4 +66,4 @@ Oyun ayarları: kazanma eşiği `backend/src/similarity.rs`, süre ve puan `back
 
 Oyun başlatma, tahmin ve yönetim istekleri IP başına sınırlı. Sınır aşılınca sunucu 429 ve `Retry-After` döner. Sayaçlar oyunlar gibi süreç belleğinde tutuluyor, bu yüzden arka uç tek kopya çalışır.
 
-Arka uç bir ters vekilin (nginx vb.) arkasındaysa `CLIENT_IP_HEADER=X-Real-IP` ver, yoksa bütün oyuncular tek IP sayılır. Bu başlığa yalnızca vekil dışarıya kapalıyken güven, yoksa oyuncular IP'lerini taklit edebilir.
+Arka uç oyuncunun IP'sini nginx'in eklediği `X-Real-IP` başlığından okur (`CLIENT_IP_HEADER`). Bu yüzden `backend` kapsayıcısının portu dışarıya açılmamalı, yoksa oyuncular IP'lerini taklit edebilir.
