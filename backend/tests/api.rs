@@ -5,16 +5,17 @@ use serde_json::{Value, json};
 
 use sozcuklemece_backend::clock::Clock;
 use sozcuklemece_backend::daily_word::WORD_TTL_SECONDS;
-use sozcuklemece_backend::game::{GAME_RESULT_GRACE_SECONDS, GAME_SECONDS};
+use sozcuklemece_backend::game::{GAME_RESULT_GRACE_SECONDS, GAME_SECONDS, GUESS_INTERVAL_SECONDS};
 use sozcuklemece_backend::rate_limit::{ADMIN_LIMIT, GUESS_LIMIT, GUESS_WINDOW_SECONDS};
 use support::{ADMIN_TOKEN, FakeTeiMode, TestServer, first_puzzle, game_day_noon, second_puzzle};
 
 const UNKNOWN_GUESS: &str = "bambaşka bir açıklama";
 
-async fn use_up_guess_limit(server: &TestServer, game_id: &str) {
+async fn use_up_guess_limit(server: &TestServer) {
     for number in 0..GUESS_LIMIT {
+        let game_id = server.start_game_id().await;
         let text = format!("{UNKNOWN_GUESS} {number}");
-        assert_eq!(server.guess(game_id, &text).await.status, StatusCode::OK);
+        assert_eq!(server.guess(&game_id, &text).await.status, StatusCode::OK);
     }
 }
 
@@ -572,7 +573,7 @@ async fn admin_attempts_are_rate_limited() {
 async fn guess_over_the_limit_is_refused_with_a_wait_time() {
     let server = TestServer::with_word().await;
     let game_id = server.start_game_id().await;
-    use_up_guess_limit(&server, &game_id).await;
+    use_up_guess_limit(&server).await;
 
     let refused = server.guess(&game_id, UNKNOWN_GUESS).await;
 
@@ -589,21 +590,18 @@ async fn guess_over_the_limit_is_refused_with_a_wait_time() {
 async fn refused_guess_does_not_reach_the_game() {
     let server = TestServer::with_word().await;
     let game_id = server.start_game_id().await;
-    use_up_guess_limit(&server, &game_id).await;
+    use_up_guess_limit(&server).await;
 
     server.guess(&game_id, UNKNOWN_GUESS).await;
 
-    assert_eq!(
-        server.finish(&game_id).await.body["guess_count"],
-        GUESS_LIMIT as u64
-    );
+    assert_eq!(server.finish(&game_id).await.body["guess_count"], 0);
 }
 
 #[tokio::test]
 async fn guess_is_accepted_again_after_the_window() {
     let server = TestServer::with_word().await;
     let game_id = server.start_game_id().await;
-    use_up_guess_limit(&server, &game_id).await;
+    use_up_guess_limit(&server).await;
 
     server.advance_clock(GUESS_WINDOW_SECONDS);
 
@@ -617,7 +615,7 @@ async fn guess_is_accepted_again_after_the_window() {
 async fn guess_limit_is_counted_per_client() {
     let server = TestServer::with_word().await;
     let game_id = server.start_game_id().await;
-    use_up_guess_limit(&server, &game_id).await;
+    use_up_guess_limit(&server).await;
 
     let other_player = server
         .guess_from(&game_id, UNKNOWN_GUESS, "203.0.113.7")
@@ -630,7 +628,7 @@ async fn guess_limit_is_counted_per_client() {
 async fn hints_and_finish_still_work_after_the_guess_limit() {
     let server = TestServer::with_word().await;
     let game_id = server.start_game_id().await;
-    use_up_guess_limit(&server, &game_id).await;
+    use_up_guess_limit(&server).await;
 
     let hint = server
         .post(
@@ -642,4 +640,58 @@ async fn hints_and_finish_still_work_after_the_guess_limit() {
 
     assert_eq!(hint.status, StatusCode::OK);
     assert_eq!(finish.status, StatusCode::OK);
+}
+
+#[tokio::test]
+async fn start_tells_the_player_how_long_to_wait_between_guesses() {
+    let server = TestServer::with_word().await;
+    assert_eq!(
+        server.start_game().await["guess_interval_seconds"],
+        GUESS_INTERVAL_SECONDS
+    );
+}
+
+#[tokio::test]
+async fn guess_sent_too_soon_is_refused_with_a_wait_time() {
+    let server = TestServer::with_word().await;
+    let game_id = server.start_game_id().await;
+    server.guess(&game_id, UNKNOWN_GUESS).await;
+
+    let refused = server.guess(&game_id, "bir başka tahmin").await;
+
+    assert_eq!(refused.status, StatusCode::TOO_MANY_REQUESTS);
+    let retry_after: f64 = refused.headers["retry-after"]
+        .to_str()
+        .unwrap()
+        .parse()
+        .unwrap();
+    assert_eq!(retry_after, GUESS_INTERVAL_SECONDS.ceil());
+    assert_eq!(server.finish(&game_id).await.body["guess_count"], 1);
+}
+
+#[tokio::test]
+async fn guess_after_the_interval_is_accepted() {
+    let server = TestServer::with_word().await;
+    let game_id = server.start_game_id().await;
+    server.guess(&game_id, UNKNOWN_GUESS).await;
+
+    server.advance_clock(GUESS_INTERVAL_SECONDS);
+
+    assert_eq!(
+        server.guess(&game_id, "bir başka tahmin").await.status,
+        StatusCode::OK
+    );
+}
+
+#[tokio::test]
+async fn each_game_waits_on_its_own() {
+    let server = TestServer::with_word().await;
+    let first_game_id = server.start_game_id().await;
+    let second_game_id = server.start_game_id().await;
+    server.guess(&first_game_id, UNKNOWN_GUESS).await;
+
+    assert_eq!(
+        server.guess(&second_game_id, UNKNOWN_GUESS).await.status,
+        StatusCode::OK
+    );
 }

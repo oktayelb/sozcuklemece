@@ -7,6 +7,8 @@ const game = {
   id: null,
   durationSeconds: 0,
   hintPenalty: 0,
+  guessIntervalSeconds: 0,
+  nextGuessAt: 0,
   deadline: 0,
   timerId: null,
   isStarting: false,
@@ -133,8 +135,25 @@ function renderClock() {
   element("game-screen").classList.toggle("low-time", remaining <= LOW_TIME_SECONDS);
 }
 
+function secondsUntilNextGuess() {
+  return Math.max(0, (game.nextGuessAt - performance.now()) / 1000);
+}
+
+function startGuessWait() {
+  game.nextGuessAt = performance.now() + game.guessIntervalSeconds * 1000;
+  renderGuessButton();
+}
+
+function renderGuessButton() {
+  const button = element("guess-button");
+  const waitSeconds = Math.ceil(secondsUntilNextGuess());
+  button.disabled = game.isSubmitting || waitSeconds > 0;
+  button.textContent = waitSeconds > 0 ? `Yaz (${waitSeconds})` : "Yaz";
+}
+
 function tick() {
   renderClock();
+  renderGuessButton();
   if (secondsRemaining() <= 0) {
     endGame();
   }
@@ -215,12 +234,12 @@ async function submitGuess(event) {
   event.preventDefault();
   const input = element("guess-input");
   const text = input.value.trim();
-  if (text === "" || game.isSubmitting) {
+  if (text === "" || game.isSubmitting || secondsUntilNextGuess() > 0) {
     return;
   }
 
   game.isSubmitting = true;
-  element("guess-button").disabled = true;
+  renderGuessButton();
   try {
     const response = await callApi(`/api/games/${game.id}/guesses`, { text });
     if (response.won) {
@@ -241,7 +260,7 @@ async function submitGuess(event) {
     element("guess-feedback").textContent = requestFailureMessage(error, "Tahmin gönderilemedi, tekrar dene.");
   } finally {
     game.isSubmitting = false;
-    element("guess-button").disabled = false;
+    startGuessWait();
     input.focus();
   }
 }
@@ -258,6 +277,8 @@ async function startGame() {
     game.id = started.game_id;
     game.durationSeconds = started.duration_seconds;
     game.hintPenalty = started.hint_penalty;
+    game.guessIntervalSeconds = started.guess_interval_seconds;
+    game.nextGuessAt = 0;
     game.isEnding = false;
     syncWithServer(started);
 
@@ -270,6 +291,7 @@ async function startGame() {
     showScreen("game-screen");
     element("guess-input").focus();
     renderClock();
+    renderGuessButton();
     game.timerId = setInterval(tick, TICK_MILLISECONDS);
   } catch (error) {
     showError(requestFailureMessage(error, "Oyun başlatılamadı. Biraz sonra tekrar dene."));

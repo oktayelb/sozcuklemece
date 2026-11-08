@@ -65,6 +65,8 @@ Oyun ayarları: kazanma eşiği ve önbellek boyutu `backend/src/similarity.rs`,
 
 ## İstek sınırı
 
-Oyun başlatma, tahmin ve yönetim istekleri IP başına sınırlı. Sınır aşılınca sunucu 429 ve `Retry-After` döner. Sayaçlar oyunlar gibi süreç belleğinde tutuluyor, bu yüzden arka uç tek kopya çalışır.
+Oyun başlatma, tahmin ve yönetim istekleri IP başına sınırlı. Sınır aşılınca sunucu 429 ve `Retry-After` döner.
+
+Ayrıca her oyunda iki tahmin arasında en az `GUESS_INTERVAL_SECONDS` (`backend/src/game.rs`, şimdilik 2 sn) beklenir. Ön yüz bu sürede tahmin düğmesini kapatır, arka uç erken gelen tahmini yine 429 ile reddeder. Süre, gerçek oyuncu verisi gelince ayarlanacak. Sayaçlar oyunlar gibi süreç belleğinde tutuluyor, bu yüzden arka uç tek kopya çalışır.
 
 Arka uç oyuncunun IP'sini nginx'in eklediği `X-Real-IP` başlığından okur (`CLIENT_IP_HEADER`). Bu yüzden `backend` kapsayıcısının portu dışarıya açılmamalı, yoksa oyuncular IP'lerini taklit edebilir.

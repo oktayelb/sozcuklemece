@@ -17,8 +17,8 @@ use crate::config::Config;
 use crate::daily_word::{DailyWordStore, StoreError, game_day, moment_in_game_timezone};
 use crate::encoder::{EncoderError, TeiEncoder};
 use crate::game::{
-    FinishResponse, GAME_SECONDS, Game, GuessCheck, GuessResponse, HINT_KINDS, HINT_PENALTY,
-    HintKind, HintResponse, MAX_GUESS_LENGTH, remove_stale_games,
+    FinishResponse, GAME_SECONDS, GUESS_INTERVAL_SECONDS, Game, GuessCheck, GuessResponse,
+    HINT_KINDS, HINT_PENALTY, HintKind, HintResponse, MAX_GUESS_LENGTH, remove_stale_games,
 };
 use crate::puzzle::Puzzle;
 use crate::rate_limit::{
@@ -241,6 +241,7 @@ struct StartResponse {
     hints: Vec<HintOption>,
     duration_seconds: i64,
     hint_penalty: i64,
+    guess_interval_seconds: f64,
     remaining_seconds: f64,
     score: i64,
 }
@@ -332,6 +333,7 @@ async fn start_game(
         hints,
         duration_seconds: GAME_SECONDS as i64,
         hint_penalty: HINT_PENALTY,
+        guess_interval_seconds: GUESS_INTERVAL_SECONDS,
         remaining_seconds: game.remaining_seconds(now),
         score: game.current_score(now),
     };
@@ -377,6 +379,9 @@ async fn submit_guess(
             return Err(ApiError::GameNotFound);
         };
         match game.check_guess(&body.text, now) {
+            GuessCheck::TooSoon { seconds_to_wait } => {
+                return Err(ApiError::TooManyRequests { seconds_to_wait });
+            }
             GuessCheck::Answered(response) => return Ok(Json(response)),
             GuessCheck::NeedsJudging(word) => word,
         }

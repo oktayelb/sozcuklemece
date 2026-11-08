@@ -16,6 +16,7 @@ pub const HINT_PENALTY: i64 = 150;
 pub const MIN_GUESS_LENGTH: usize = 3;
 pub const MAX_GUESS_LENGTH: usize = 200;
 pub const WIN_CLOSENESS: i64 = 100;
+pub const GUESS_INTERVAL_SECONDS: f64 = 2.0;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -106,6 +107,7 @@ pub struct FinishResponse {
 }
 
 pub enum GuessCheck {
+    TooSoon { seconds_to_wait: f64 },
     Answered(GuessResponse),
     NeedsJudging(Arc<PreparedWord>),
 }
@@ -121,6 +123,7 @@ pub struct Game {
     won: bool,
     final_score: i64,
     seconds_used: f64,
+    last_guess_at: Option<f64>,
 }
 
 impl Game {
@@ -136,6 +139,7 @@ impl Game {
             won: false,
             final_score: 0,
             seconds_used: 0.0,
+            last_guess_at: None,
         }
     }
 
@@ -232,11 +236,24 @@ impl Game {
         }
     }
 
+    fn seconds_until_next_guess(&self, now: f64) -> f64 {
+        match self.last_guess_at {
+            Some(last_guess_at) => last_guess_at + GUESS_INTERVAL_SECONDS - now,
+            None => 0.0,
+        }
+    }
+
     pub fn check_guess(&mut self, text: &str, now: f64) -> GuessCheck {
         self.finish_if_time_is_up(now);
         if self.finished {
             return GuessCheck::Answered(self.guess_response(now, "Oyun bitti.", None, false));
         }
+        let seconds_to_wait = self.seconds_until_next_guess(now);
+        if seconds_to_wait > 0.0 {
+            return GuessCheck::TooSoon { seconds_to_wait };
+        }
+        self.last_guess_at = Some(now);
+
         if normalize_text(text).chars().count() < MIN_GUESS_LENGTH {
             return GuessCheck::Answered(self.guess_response(
                 now,
@@ -333,6 +350,7 @@ mod tests {
 
     fn submit(game: &mut Game, text: &str, similarity: f64, now: f64) -> GuessResponse {
         match game.check_guess(text, now) {
+            GuessCheck::TooSoon { .. } => panic!("tahmin aralığı beklenmedi"),
             GuessCheck::Answered(response) => response,
             GuessCheck::NeedsJudging(_) => game.record_judged_guess(similarity, now),
         }
@@ -540,5 +558,53 @@ mod tests {
         assert_eq!(closeness_label(70), "Yakın");
         assert_eq!(closeness_label(40), "Isınıyor");
         assert_eq!(closeness_label(5), "Uzak");
+    }
+
+    #[test]
+    fn second_guess_must_wait_for_the_interval() {
+        let mut game = new_game();
+        submit(&mut game, "sosu silen kaşık", 0.3, START);
+
+        let GuessCheck::TooSoon { seconds_to_wait } =
+            game.check_guess("bir başka tahmin", START + 0.5)
+        else {
+            panic!("tahmin reddedilmeliydi");
+        };
+        assert_eq!(seconds_to_wait, GUESS_INTERVAL_SECONDS - 0.5);
+
+        let response = submit(
+            &mut game,
+            "bir başka tahmin",
+            0.3,
+            START + GUESS_INTERVAL_SECONDS,
+        );
+        assert!(!response.rejected);
+    }
+
+    #[test]
+    fn refused_early_guess_does_not_restart_the_wait() {
+        let mut game = new_game();
+        submit(&mut game, "sosu silen kaşık", 0.3, START);
+        game.check_guess("erken tahmin", START + 1.0);
+
+        let response = submit(
+            &mut game,
+            "bir başka tahmin",
+            0.3,
+            START + GUESS_INTERVAL_SECONDS,
+        );
+
+        assert_eq!(game.result().guess_count, 2);
+        assert!(!response.rejected);
+    }
+
+    #[test]
+    fn too_short_guess_also_starts_the_wait() {
+        let mut game = new_game();
+        submit(&mut game, "a!", 0.3, START);
+        assert!(matches!(
+            game.check_guess("bir başka tahmin", START + 1.0),
+            GuessCheck::TooSoon { .. }
+        ));
     }
 }
