@@ -1,0 +1,13 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      ADMIN_TOKEN: ${ADMIN_TOKEN:?ADMIN_TOKEN ayarlanmalı}
+    volumes:
+      - word-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  word-data:

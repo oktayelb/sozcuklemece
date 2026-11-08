@@ -26,6 +26,12 @@ Ardından http://127.0.0.1:8000 adresini aç. İlk açılışta model (yaklaşı
 
 Testler: `uv run pytest`
 
+## Docker ile çalıştırma
+
+    ADMIN_TOKEN=uzun-rastgele-bir-parola docker compose up -d --build
+
+Model imajın içine indirilir, kapsayıcı açılışta internete çıkmaz. Günün sözcüğü `word-data` biriminde durur, yeniden başlatmada kaybolmaz. Ters vekil ayrı bir kapsayıcıdaysa `FORWARDED_ALLOW_IPS` ortam değişkenine vekilin IP'sini ver.
+
 ## Günün sözcüğünü yükleme
 
 http://127.0.0.1:8000/admin/ adresini aç, `ADMIN_TOKEN` parolasını gir, formu doldurup yayınla. `ADMIN_TOKEN` ayarlı değilse yükleme kapalıdır. Parola düz metin gittiği için canlıda HTTPS kullan.

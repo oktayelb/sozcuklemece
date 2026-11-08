@@ -1,0 +1,7 @@
+We need to redesign the architecture to be scalable and fast.First seperate the frontend and backend into seperate containers. A headless approach is way better as we can serve the frontend in a cache , way faster so that our server gets  busy only with importsnt things. Each request should also go thru an invisible turnstile or captcha, and only be prompted to take the test when it fails. If this approach is not viable with captcha and turnstile, think of an alternative.
+Frontend also bottlenecks a users guess requests to N seconds so  we can be sure that each player can send a request only every N seconds. Determining this N will be a later empirical job. the arriving guess requests will be served to the workers by a doorman (nginx? idk or a queuer). THese backend workers will serve requests. 
+However an ever better improvement is making seperate ai servers specifically for model computations. They only need the model and torch, so backend containers become extremely lightweight and scalable, minimally  sized containers. 
+
+The backend servers need to be extremely fast, so we need to rewrite them using rust. We should also be using async and queueing so that the servers still can get requestswhile the ai calculations are ongoing. ai servers can be python microservices maybe. 
+
+Evaluate this idea, point out strong and weak parts, add you ideas if you see any room for improvement.
