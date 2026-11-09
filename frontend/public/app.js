@@ -5,6 +5,7 @@ const PENCIL_SOUND_VOLUME = 0.7;
 const PLAYER_ID_STORAGE_KEY = "sozcuklemece-oyuncu";
 const MAX_GUESS_LENGTH = 200;
 const SHOW_LENGTH_FROM = 150;
+const HUMAN_CHECK_TOKEN_LIFETIME_MILLISECONDS = 270 * 1000;
 
 const game = {
   id: null,
@@ -29,6 +30,7 @@ const game = {
 let turnstileSiteKey = null;
 let turnstileAction = null;
 let todaysResult = null;
+let preparedHumanCheck = null;
 
 const playerId = loadPlayerId();
 
@@ -164,6 +166,33 @@ function requestHumanCheckToken() {
   });
 }
 
+function whenPageLoaded() {
+  if (document.readyState === "complete") {
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => window.addEventListener("load", resolve, { once: true }));
+}
+
+function prepareHumanCheck() {
+  const tokenPromise = whenPageLoaded().then(requestHumanCheckToken);
+  tokenPromise.catch(() => {});
+  preparedHumanCheck = { tokenPromise, requestedAt: Date.now() };
+}
+
+async function takeHumanCheckToken() {
+  const prepared = preparedHumanCheck;
+  preparedHumanCheck = null;
+  const isFresh = prepared !== null && Date.now() - prepared.requestedAt < HUMAN_CHECK_TOKEN_LIFETIME_MILLISECONDS;
+  if (isFresh) {
+    try {
+      return await prepared.tokenPromise;
+    } catch (error) {
+      return requestHumanCheckToken();
+    }
+  }
+  return requestHumanCheckToken();
+}
+
 function requestFailureMessage(error, fallbackMessage) {
   if (error instanceof HumanCheckError) {
     return "İnsan doğrulaması yapılamadı. Sayfayı yenileyip tekrar dene.";
@@ -222,7 +251,11 @@ async function loadLandingPage() {
     turnstileSiteKey = today.turnstile_site_key;
     turnstileAction = today.turnstile_action;
     if (today.word_available) {
-      showPlayButton(await fetchPlayerToday());
+      const playerToday = await fetchPlayerToday();
+      showPlayButton(playerToday);
+      if (playerToday.state === "new") {
+        prepareHumanCheck();
+      }
     } else {
       showError("Bugünün sözcüğü henüz hazır değil. Biraz sonra tekrar dene.");
     }
@@ -518,7 +551,7 @@ async function startGame() {
   game.isStarting = true;
   clearError();
   try {
-    const turnstileToken = await requestHumanCheckToken();
+    const turnstileToken = await takeHumanCheckToken();
     const started = await callApi("/api/games", {
       turnstile_token: turnstileToken,
       player_id: playerId,
