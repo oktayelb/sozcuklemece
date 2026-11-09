@@ -30,7 +30,7 @@ WORKDIR /build
 COPY Cargo.toml Cargo.lock ./
 COPY src ./src
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,target=/build/target \
+    --mount=type=cache,id=ai-target,target=/build/target \
     cargo build --release --locked \
     && cp target/release/sozcuklemece-ai /sozcuklemece-ai
 

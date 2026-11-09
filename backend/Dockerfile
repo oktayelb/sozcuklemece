@@ -5,7 +5,7 @@ COPY Cargo.toml Cargo.lock ./
 COPY src ./src
 COPY resources ./resources
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,target=/build/target \
+    --mount=type=cache,id=backend-target,target=/build/target \
     cargo build --release --locked --bin sozcuklemece-backend \
     && cp target/release/sozcuklemece-backend /sozcuklemece-backend
 RUN mkdir /data
