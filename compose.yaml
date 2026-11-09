@@ -2,6 +2,8 @@ services:
   frontend:
     build: ./frontend
     image: sozcuklemece-frontend
+    environment:
+      ADMIN_PATH: ${ADMIN_PATH:?.env dosyasında ADMIN_PATH ayarlanmalı}
     ports:
       - "8000:8080"
     depends_on:

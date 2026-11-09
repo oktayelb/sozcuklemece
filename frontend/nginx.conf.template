@@ -21,6 +21,17 @@ server {
         add_header Cache-Control "no-store" always;
     }
 
+    location = /${ADMIN_PATH} {
+        return 301 /${ADMIN_PATH}/;
+    }
+
+    location ^~ /${ADMIN_PATH}/ {
+        alias /usr/share/nginx/admin/;
+        add_header Cache-Control "no-store" always;
+        add_header Referrer-Policy "no-referrer" always;
+        add_header X-Robots-Tag "noindex, nofollow" always;
+    }
+
     location ~* \.(woff2|mp3)$ {
         add_header Cache-Control "public, max-age=2592000";
     }

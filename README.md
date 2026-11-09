@@ -31,7 +31,7 @@ Beş kapsayıcı:
     cp .env.example .env
     docker compose up -d --build
 
-`.env` dosyasında `ADMIN_TOKEN`'ı uzun, rastgele bir parolayla değiştir. Bu dosya depoya girmez, Compose onu kendiliğinden okur.
+`.env` dosyasında `ADMIN_TOKEN`'ı uzun, rastgele bir parolayla, `ADMIN_PATH`'i tahmin edilemeyen bir yolla (yalnız harf, rakam ve tire) değiştir. Bu dosya depoya girmez, Compose onu kendiliğinden okur.
 
 Ardından http://127.0.0.1:8000 adresini aç. İlk derleme modeli indirip ONNX'e çevirdiği için birkaç dakika sürer. Günün sözcüğü `word-data` biriminde durur, yeniden başlatmada kaybolmaz.
 
@@ -61,7 +61,7 @@ Tarayıcı ilk açılışta rastgele bir oyuncu kimliği üretip `localStorage`'
 
 ## Sınırdaki tahminler ve itirazlar
 
-Eşiğe yaklaşıp (yakınlık %70 ve üstü) kazanamayan tahminler ve oyuncuların "Bence doğru" itirazları `/admin/` sayfasındaki listeye düşer. Oyuncu yakınlığı %50 ve üstü olan tahminlere oyun başına en çok 3 kez itiraz edebilir. Yönetici her tahmini doğru anlatım, zıt anlam ya da yanlış anlam olarak sözcüğe ekler ya da geçer. Ekleme sözcüğü hemen yeniden hazırlar ve dosyaya yazar. Süren oyunlar yeni haliyle devam eder, bugünkü oyuncular ve istatistikler silinmez. Liste yalnızca bellekte, o sözcük boyunca tutulur (en çok 300 tahmin). Bu liste, ileride modeli gerçek oyuncu tahminleriyle ölçmenin de kaynağı.
+Eşiğe yaklaşıp (yakınlık %70 ve üstü) kazanamayan tahminler ve oyuncuların "Bence doğru" itirazları yönetici sayfasındaki listeye düşer. Oyuncu yakınlığı %50 ve üstü olan tahminlere oyun başına en çok 3 kez itiraz edebilir. Yönetici her tahmini doğru anlatım, zıt anlam ya da yanlış anlam olarak sözcüğe ekler ya da geçer. Ekleme sözcüğü hemen yeniden hazırlar ve dosyaya yazar. Süren oyunlar yeni haliyle devam eder, bugünkü oyuncular ve istatistikler silinmez. Liste yalnızca bellekte, o sözcük boyunca tutulur (en çok 300 tahmin). Bu liste, ileride modeli gerçek oyuncu tahminleriyle ölçmenin de kaynağı.
 
 ## Önbellek ve CDN
 
@@ -69,7 +69,7 @@ nginx ön yüz dosyalarını önbellek başlıklarıyla sunar: HTML, JS ve CSS 5
 
 ## Günün sözcüğünü yükleme
 
-`/admin/` sayfasını aç, `ADMIN_TOKEN` parolasını gir, formu doldurup yayınla. `ADMIN_TOKEN` ayarlı değilse yükleme kapalıdır. Parola düz metin gittiği için canlıda HTTPS kullan.
+`/<ADMIN_PATH>/` sayfasını aç, `ADMIN_TOKEN` parolasını gir, formu doldurup yayınla. `ADMIN_TOKEN` ayarlı değilse yükleme kapalıdır. Parola düz metin gittiği için canlıda HTTPS kullan. Depo herkese açık olduğundan yönetici sayfasının yolu kodda değil `.env` içindedir. Gizli yol yalnızca sayfayı saklar, asıl koruma parola ve `/api/admin/` isteklerinin istek sınırıdır.
 
 - Sözcüğün işlenmiş hali yüklenirken hazırlanır ve bellekte durur, tahminlerde yeniden hesaplanmaz.
 - Yayınlamadan önce "Deneme tahminleri" bölümüne oyuncuların yazabileceği tahminleri yazıp "Dene"ye bas. Sayfa hangilerinin yanlış değerlendirildiğini gösterir, yanlış değerlendirileni tek tıkla doğru anlatımlara ya da yanlış anlamlara taşırsın.
