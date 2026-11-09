@@ -1,4 +1,4 @@
-FROM python:3.12-slim AS export
+FROM --platform=$BUILDPLATFORM python:3.12-slim AS export
 
 ARG MODEL_ID=emrecan/bert-base-turkish-cased-mean-nli-stsb-tr
 ARG MODEL_REVISION=7e10e2fbd7627fd0228eb2dbdc9e9da264442bbe
@@ -22,9 +22,20 @@ RUN optimum-cli export onnx --model /model --task feature-extraction /exported \
         /model/tokenizer.json /quantization/calibration_texts.txt \
     && rm -rf /model/model.safetensors /model/.cache /exported /tmp/prepared_model.onnx
 
-FROM ghcr.io/huggingface/text-embeddings-inference:cpu-1.9
+FROM rust:1.96-trixie AS build
+
+WORKDIR /build
+COPY Cargo.toml Cargo.lock ./
+COPY src ./src
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/build/target \
+    cargo build --release --locked \
+    && cp target/release/sozcuklemece-ai /sozcuklemece-ai
+
+FROM gcr.io/distroless/cc-debian13:nonroot
 
 COPY --from=export /model /model
-ENV HF_HUB_OFFLINE=1
+COPY --from=build /sozcuklemece-ai /usr/local/bin/sozcuklemece-ai
 
-CMD ["--model-id", "/model"]
+ENTRYPOINT ["/usr/local/bin/sozcuklemece-ai"]
+CMD ["embed", "/model"]
