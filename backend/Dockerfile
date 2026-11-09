@@ -17,7 +17,7 @@ COPY --from=build --chown=65532:65532 /data /app/data
 
 WORKDIR /app
 ENV BIND_ADDRESS=0.0.0.0:8000 \
-    WORD_FILE=/app/data/current_word.json
+    SCHEDULE_FILE=/app/data/schedule.json
 VOLUME /app/data
 EXPOSE 8000
 

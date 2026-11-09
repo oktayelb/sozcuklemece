@@ -4,7 +4,6 @@ use axum::http::{Method, StatusCode};
 use serde_json::{Value, json};
 
 use sozcuklemece_backend::clock::Clock;
-use sozcuklemece_backend::daily_word::WORD_TTL_SECONDS;
 use sozcuklemece_backend::game::{GAME_RESULT_GRACE_SECONDS, GAME_SECONDS, GUESS_INTERVAL_SECONDS};
 use sozcuklemece_backend::puzzle::Puzzle;
 use sozcuklemece_backend::rate_limit::{
@@ -13,10 +12,11 @@ use sozcuklemece_backend::rate_limit::{
 use sozcuklemece_backend::similarity::HIGHEST_WIN_SIMILARITY;
 use sozcuklemece_backend::text::normalize_text;
 use support::{
-    ADMIN_TOKEN, ApiResponse, FAKE_TEI_MAX_WORDS, FakeTeiMode, FakeTurnstileMode,
-    OTHER_ACTION_TURNSTILE_TOKEN, OTHER_SITE_TURNSTILE_TOKEN, PLAYER_IP,
-    TESTING_KEY_TURNSTILE_TOKEN, TURNSTILE_SITE_KEY, TestServer, VALID_TURNSTILE_TOKEN,
-    entailing_guess, first_puzzle, game_day_noon, near_guess, new_player_id, second_puzzle,
+    ADMIN_TOKEN, ApiResponse, FAKE_TEI_MAX_WORDS, FakeTeiMode, FakeTurnstileMode, GAME_DAY,
+    NEXT_GAME_DAY, OTHER_ACTION_TURNSTILE_TOKEN, OTHER_SITE_TURNSTILE_TOKEN, PLAYER_IP,
+    SECONDS_FROM_NOON_TO_MIDNIGHT, TESTING_KEY_TURNSTILE_TOKEN, TURNSTILE_SITE_KEY, TestServer,
+    VALID_TURNSTILE_TOKEN, entailing_guess, first_puzzle, game_day_noon, near_guess, new_player_id,
+    second_puzzle,
 };
 
 const UNKNOWN_GUESS: &str = "bambaşka bir açıklama";
@@ -245,9 +245,9 @@ async fn play_after_an_upload_gets_the_new_word() {
 }
 
 #[tokio::test]
-async fn word_is_gone_after_a_day() {
+async fn word_is_gone_at_midnight() {
     let server = TestServer::with_word().await;
-    server.advance_clock(WORD_TTL_SECONDS);
+    server.advance_clock(SECONDS_FROM_NOON_TO_MIDNIGHT);
     assert_eq!(server.get("/api/today").await.body["word_available"], false);
     assert_eq!(
         server
@@ -261,7 +261,7 @@ async fn word_is_gone_after_a_day() {
 #[tokio::test]
 async fn running_game_can_finish_after_its_word_expires() {
     let server = TestServer::with_word().await;
-    server.advance_clock(WORD_TTL_SECONDS - 1.0);
+    server.advance_clock(SECONDS_FROM_NOON_TO_MIDNIGHT - 1.0);
     let game_id = server.start_game_id().await;
 
     server.advance_clock(2.0);
@@ -277,9 +277,9 @@ async fn running_game_can_finish_after_its_word_expires() {
 }
 
 #[tokio::test]
-async fn cleanup_removes_an_expired_word_and_its_file() {
+async fn cleanup_removes_a_past_word_and_its_file() {
     let server = TestServer::with_word().await;
-    server.advance_clock(WORD_TTL_SECONDS);
+    server.advance_clock(SECONDS_FROM_NOON_TO_MIDNIGHT);
 
     server.state.remove_expired_state();
 
@@ -290,7 +290,7 @@ async fn cleanup_removes_an_expired_word_and_its_file() {
             .current_word(server.state.clock.unix_seconds())
             .is_none()
     );
-    assert!(!server.word_file().exists());
+    assert!(!server.schedule_file().exists());
 }
 
 #[tokio::test]
@@ -330,18 +330,20 @@ async fn word_survives_a_restart() {
 }
 
 #[tokio::test]
-async fn restart_after_a_day_finds_no_word() {
+async fn restart_after_midnight_finds_no_word() {
     let first_run = TestServer::with_word().await;
 
     let second_run = first_run
-        .restarted(Clock::manual(game_day_noon() + WORD_TTL_SECONDS))
+        .restarted(Clock::manual(
+            game_day_noon() + SECONDS_FROM_NOON_TO_MIDNIGHT,
+        ))
         .await;
 
     assert_eq!(
         second_run.get("/api/today").await.body["word_available"],
         false
     );
-    assert!(!second_run.word_file().exists());
+    assert!(!second_run.schedule_file().exists());
 }
 
 #[tokio::test]
@@ -441,7 +443,161 @@ async fn status_without_a_word() {
         )
         .await
         .body;
-    assert_eq!(body, json!({ "word": null, "expires_at": null }));
+    assert_eq!(
+        body,
+        json!({ "today": GAME_DAY, "word": null, "expires_at": null, "scheduled": [] })
+    );
+}
+
+#[tokio::test]
+async fn word_scheduled_for_tomorrow_starts_at_midnight() {
+    let server = TestServer::with_word().await;
+    let published = server.publish_on(&second_puzzle(), NEXT_GAME_DAY).await;
+    assert_eq!(published.status, StatusCode::OK);
+    assert_eq!(published.body["word"], first_puzzle().word.as_str());
+    assert_eq!(
+        server.start_game().await["word"],
+        first_puzzle().word.as_str()
+    );
+
+    server.advance_clock(SECONDS_FROM_NOON_TO_MIDNIGHT);
+
+    assert_eq!(
+        server.start_game().await["word"],
+        second_puzzle().word.as_str()
+    );
+}
+
+#[tokio::test]
+async fn word_scheduled_days_ahead_is_ready_at_its_midnight() {
+    let server = TestServer::empty().await;
+    assert_eq!(
+        server
+            .publish_on(&second_puzzle(), "2026-11-08")
+            .await
+            .status,
+        StatusCode::OK
+    );
+    server.advance_clock(SECONDS_FROM_NOON_TO_MIDNIGHT + 60.0);
+    server.prepare_upcoming_words().await;
+
+    server.advance_clock(24.0 * 60.0 * 60.0);
+
+    assert_eq!(server.get("/api/today").await.body["word_available"], true);
+    assert_eq!(
+        server.start_game().await["word"],
+        second_puzzle().word.as_str()
+    );
+}
+
+#[tokio::test]
+async fn status_lists_the_schedule() {
+    let server = TestServer::with_word().await;
+    server.publish_on(&second_puzzle(), NEXT_GAME_DAY).await;
+    let body = server.admin_get("/api/admin/word").await.body;
+    assert_eq!(
+        body["scheduled"],
+        json!([
+            { "date": GAME_DAY, "word": first_puzzle().word },
+            { "date": NEXT_GAME_DAY, "word": second_puzzle().word },
+        ])
+    );
+}
+
+#[tokio::test]
+async fn scheduled_word_can_be_read_back_for_editing() {
+    let server = TestServer::with_word().await;
+    server.publish_on(&second_puzzle(), NEXT_GAME_DAY).await;
+    let response = server
+        .admin_get(&format!("/api/admin/word/{NEXT_GAME_DAY}"))
+        .await;
+    assert_eq!(response.status, StatusCode::OK);
+    assert_eq!(
+        response.body,
+        serde_json::to_value(second_puzzle()).unwrap()
+    );
+}
+
+#[tokio::test]
+async fn publishing_on_a_scheduled_day_replaces_that_word() {
+    let server = TestServer::with_word().await;
+    server.publish_on(&second_puzzle(), NEXT_GAME_DAY).await;
+    server.publish_on(&first_puzzle(), NEXT_GAME_DAY).await;
+    let body = server.admin_get("/api/admin/word").await.body;
+    assert_eq!(body["scheduled"][1]["word"], first_puzzle().word.as_str());
+}
+
+#[tokio::test]
+async fn deleted_day_has_no_word() {
+    let server = TestServer::with_word().await;
+    server.publish_on(&second_puzzle(), NEXT_GAME_DAY).await;
+
+    let response = server
+        .admin_delete(&format!("/api/admin/word/{NEXT_GAME_DAY}"))
+        .await;
+
+    assert_eq!(response.status, StatusCode::OK);
+    assert_eq!(response.body["scheduled"].as_array().unwrap().len(), 1);
+    server.advance_clock(SECONDS_FROM_NOON_TO_MIDNIGHT);
+    assert_eq!(server.get("/api/today").await.body["word_available"], false);
+}
+
+#[tokio::test]
+async fn unknown_or_malformed_day_is_refused() {
+    let server = TestServer::with_word().await;
+    assert_eq!(
+        server.admin_get("/api/admin/word/2026-12-01").await.status,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        server
+            .admin_delete("/api/admin/word/2026-12-01")
+            .await
+            .status,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        server.admin_get("/api/admin/word/yarin").await.status,
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+}
+
+#[tokio::test]
+async fn past_and_far_future_days_are_refused() {
+    let server = TestServer::empty().await;
+    for date in ["2026-11-05", "2027-02-05"] {
+        let response = server.publish_on(&second_puzzle(), date).await;
+        assert_eq!(response.status, StatusCode::UNPROCESSABLE_ENTITY, "{date}");
+    }
+    assert_eq!(server.get("/api/today").await.body["word_available"], false);
+}
+
+#[tokio::test]
+async fn schedule_needs_the_right_password() {
+    let server = TestServer::with_word().await;
+    let path = format!("/api/admin/word/{GAME_DAY}");
+    assert_eq!(server.get(&path).await.status, StatusCode::UNAUTHORIZED);
+    assert_eq!(
+        server.call(Method::DELETE, &path, None, &[]).await.status,
+        StatusCode::UNAUTHORIZED
+    );
+}
+
+#[tokio::test]
+async fn schedule_survives_a_restart() {
+    let first_run = TestServer::with_word().await;
+    first_run.publish_on(&second_puzzle(), NEXT_GAME_DAY).await;
+
+    let second_run = first_run
+        .restarted(Clock::manual(
+            game_day_noon() + SECONDS_FROM_NOON_TO_MIDNIGHT,
+        ))
+        .await;
+
+    assert_eq!(
+        second_run.start_game().await["word"],
+        second_puzzle().word.as_str()
+    );
 }
 
 #[tokio::test]

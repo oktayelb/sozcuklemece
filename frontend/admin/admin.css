@@ -147,7 +147,8 @@
   cursor: pointer;
 }
 
-.admin-review {
+.admin-review,
+.admin-schedule {
   display: grid;
   gap: 0.4rem;
   margin-top: 1.8rem;
@@ -172,4 +173,27 @@
   flex-wrap: wrap;
   grid-column: 2 / -1;
   gap: 0.2rem 1rem;
+}
+
+.schedule-row {
+  display: grid;
+  grid-template-columns: minmax(8rem, auto) minmax(0, 1fr) auto;
+  gap: 0.2rem 0.8rem;
+  align-items: baseline;
+  padding: 0.3rem 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.schedule-day {
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+}
+
+.schedule-actions {
+  display: flex;
+  gap: 0.8rem;
+}
+
+.schedule-actions .check-move {
+  grid-column: auto;
 }

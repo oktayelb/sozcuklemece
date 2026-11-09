@@ -8,7 +8,7 @@ use chrono::{NaiveDate, TimeZone, Utc};
 use serde_json::Value;
 use tempfile::TempDir;
 
-use sozcuklemece_backend::daily_word::{DailyWordStore, WORD_TTL_SECONDS, game_day};
+use sozcuklemece_backend::daily_word::{DailyWordStore, day_after, day_end, game_day};
 use sozcuklemece_backend::encoder::TeiEncoder;
 use sozcuklemece_backend::game::{
     GAME_RESULT_GRACE_SECONDS, GAME_SECONDS, Game, remove_stale_games,
@@ -32,10 +32,7 @@ impl StoreFixture {
         let tei = FakeTei::start().await;
         let directory = TempDir::new().unwrap();
         let judge = Arc::new(MeaningJudge::new(TeiEncoder::new(&tei.url)));
-        let store = DailyWordStore::new(
-            judge.clone(),
-            directory.path().join("data/current_word.json"),
-        );
+        let store = DailyWordStore::new(judge.clone(), directory.path().join("data/schedule.json"));
         StoreFixture {
             tei,
             judge,
@@ -44,20 +41,28 @@ impl StoreFixture {
         }
     }
 
-    fn word_file(&self) -> std::path::PathBuf {
-        self.directory.path().join("data/current_word.json")
+    fn schedule_file(&self) -> std::path::PathBuf {
+        self.directory.path().join("data/schedule.json")
     }
 
     async fn restarted_store(&self) -> (FakeTei, DailyWordStore) {
         let tei = FakeTei::start().await;
         let judge = Arc::new(MeaningJudge::new(TeiEncoder::new(&tei.url)));
-        (tei, DailyWordStore::new(judge, self.word_file()))
+        (tei, DailyWordStore::new(judge, self.schedule_file()))
     }
 }
 
-fn saved_puzzle(word_file: &Path) -> Puzzle {
-    let saved: Value = serde_json::from_str(&fs::read_to_string(word_file).unwrap()).unwrap();
-    serde_json::from_value(saved["puzzle"].clone()).unwrap()
+fn midnight_after(now: f64) -> f64 {
+    day_end(game_day(now))
+}
+
+fn tomorrow_of(now: f64) -> NaiveDate {
+    day_after(game_day(now))
+}
+
+fn saved_puzzle(schedule_file: &Path, day: NaiveDate) -> Puzzle {
+    let saved: Value = serde_json::from_str(&fs::read_to_string(schedule_file).unwrap()).unwrap();
+    serde_json::from_value(saved[day.to_string()].clone()).unwrap()
 }
 
 #[tokio::test]
@@ -69,7 +74,11 @@ async fn there_is_no_word_before_the_first_upload() {
 #[tokio::test]
 async fn published_word_is_served() {
     let fixture = StoreFixture::new().await;
-    fixture.store.publish(first_puzzle(), START).await.unwrap();
+    fixture
+        .store
+        .publish(first_puzzle(), game_day(START), START)
+        .await
+        .unwrap();
     assert_eq!(
         fixture.store.current_word(START).unwrap().word.puzzle,
         first_puzzle()
@@ -79,10 +88,14 @@ async fn published_word_is_served() {
 #[tokio::test]
 async fn new_word_replaces_the_old_one_in_memory_and_on_disk() {
     let fixture = StoreFixture::new().await;
-    fixture.store.publish(first_puzzle(), START).await.unwrap();
     fixture
         .store
-        .publish(second_puzzle(), START + 10.0)
+        .publish(first_puzzle(), game_day(START), START)
+        .await
+        .unwrap();
+    fixture
+        .store
+        .publish(second_puzzle(), game_day(START + 10.0), START + 10.0)
         .await
         .unwrap();
     assert_eq!(
@@ -94,13 +107,20 @@ async fn new_word_replaces_the_old_one_in_memory_and_on_disk() {
             .puzzle,
         second_puzzle()
     );
-    assert_eq!(saved_puzzle(&fixture.word_file()), second_puzzle());
+    assert_eq!(
+        saved_puzzle(&fixture.schedule_file(), game_day(START)),
+        second_puzzle()
+    );
 }
 
 #[tokio::test]
 async fn definition_is_processed_once_when_published() {
     let fixture = StoreFixture::new().await;
-    fixture.store.publish(first_puzzle(), START).await.unwrap();
+    fixture
+        .store
+        .publish(first_puzzle(), game_day(START), START)
+        .await
+        .unwrap();
     let word = fixture.store.current_word(START).unwrap().word;
 
     for number in 0..5 {
@@ -124,7 +144,11 @@ async fn definition_is_processed_once_when_published() {
 #[tokio::test]
 async fn guess_processes_only_the_guess() {
     let fixture = StoreFixture::new().await;
-    fixture.store.publish(first_puzzle(), START).await.unwrap();
+    fixture
+        .store
+        .publish(first_puzzle(), game_day(START), START)
+        .await
+        .unwrap();
     let word = fixture.store.current_word(START).unwrap().word;
     let texts_after_publishing = fixture.tei.encoded_texts().len();
 
@@ -141,57 +165,150 @@ async fn guess_processes_only_the_guess() {
 }
 
 #[tokio::test]
-async fn word_lasts_exactly_one_day() {
+async fn word_lasts_until_midnight() {
     let fixture = StoreFixture::new().await;
-    fixture.store.publish(first_puzzle(), START).await.unwrap();
-    assert!(
-        fixture
-            .store
-            .current_word(START + WORD_TTL_SECONDS - 1.0)
-            .is_some()
-    );
-    assert!(
-        fixture
-            .store
-            .current_word(START + WORD_TTL_SECONDS)
-            .is_none()
-    );
-}
-
-#[tokio::test]
-async fn expiry_removes_the_word_and_its_file() {
-    let fixture = StoreFixture::new().await;
-    fixture.store.publish(first_puzzle(), START).await.unwrap();
-
-    fixture.store.drop_expired_word(START + WORD_TTL_SECONDS);
-
-    assert!(fixture.store.current_word(START).is_none());
-    assert!(!fixture.word_file().exists());
-}
-
-#[tokio::test]
-async fn publishing_again_restarts_the_day() {
-    let fixture = StoreFixture::new().await;
-    fixture.store.publish(first_puzzle(), START).await.unwrap();
     fixture
         .store
-        .publish(second_puzzle(), START + WORD_TTL_SECONDS - 1.0)
+        .publish(first_puzzle(), game_day(START), START)
         .await
         .unwrap();
+    let midnight = midnight_after(START);
+    let live = fixture.store.current_word(midnight - 1.0).unwrap();
+    assert_eq!(live.expires_at, midnight);
+    assert!(fixture.store.current_word(midnight).is_none());
+}
+
+#[tokio::test]
+async fn past_day_is_removed_from_memory_and_disk() {
+    let fixture = StoreFixture::new().await;
+    fixture
+        .store
+        .publish(first_puzzle(), game_day(START), START)
+        .await
+        .unwrap();
+
+    fixture.store.drop_past_days(midnight_after(START));
+
+    assert!(fixture.store.current_word(START).is_none());
+    assert!(!fixture.schedule_file().exists());
+}
+
+#[tokio::test]
+async fn word_scheduled_for_tomorrow_waits_until_midnight() {
+    let fixture = StoreFixture::new().await;
+    fixture
+        .store
+        .publish(first_puzzle(), game_day(START), START)
+        .await
+        .unwrap();
+    fixture
+        .store
+        .publish(second_puzzle(), tomorrow_of(START), START)
+        .await
+        .unwrap();
+    let midnight = midnight_after(START);
+
+    let before = fixture.store.current_word(midnight - 1.0).unwrap();
+    let after = fixture.store.current_word(midnight).unwrap();
+
+    assert_eq!(before.word.puzzle, first_puzzle());
+    assert_eq!(after.word.puzzle, second_puzzle());
+    assert_eq!(after.expires_at, midnight_after(midnight));
+}
+
+#[tokio::test]
+async fn word_scheduled_days_ahead_is_prepared_the_day_before() {
+    let fixture = StoreFixture::new().await;
+    let third_day = tomorrow_of(midnight_after(START));
+    fixture
+        .store
+        .publish(second_puzzle(), third_day, START)
+        .await
+        .unwrap();
+    let day_before = midnight_after(START) + 60.0;
+    fixture
+        .store
+        .prepare_upcoming_words(day_before)
+        .await
+        .unwrap();
+    let encoded_before_midnight = fixture.tei.encoded_texts().len();
+
     let live = fixture
         .store
-        .current_word(START + WORD_TTL_SECONDS + 100.0)
+        .current_word(midnight_after(day_before))
         .unwrap();
+
     assert_eq!(live.word.puzzle, second_puzzle());
+    assert_eq!(fixture.tei.encoded_texts().len(), encoded_before_midnight);
+}
+
+#[tokio::test]
+async fn day_without_a_word_has_no_game() {
+    let fixture = StoreFixture::new().await;
+    fixture
+        .store
+        .publish(second_puzzle(), tomorrow_of(START), START)
+        .await
+        .unwrap();
+    assert!(fixture.store.current_word(START).is_none());
+}
+
+#[tokio::test]
+async fn past_day_and_far_future_are_refused() {
+    let fixture = StoreFixture::new().await;
+    let yesterday = game_day(START).pred_opt().unwrap();
+    let far_future = game_day(START) + chrono::Days::new(91);
+    assert!(
+        fixture
+            .store
+            .publish(first_puzzle(), yesterday, START)
+            .await
+            .is_err()
+    );
+    assert!(
+        fixture
+            .store
+            .publish(first_puzzle(), far_future, START)
+            .await
+            .is_err()
+    );
+    assert!(!fixture.schedule_file().exists());
+}
+
+#[tokio::test]
+async fn removed_day_is_gone_from_memory_and_disk() {
+    let fixture = StoreFixture::new().await;
+    fixture
+        .store
+        .publish(first_puzzle(), game_day(START), START)
+        .await
+        .unwrap();
+    fixture
+        .store
+        .publish(second_puzzle(), tomorrow_of(START), START)
+        .await
+        .unwrap();
+
+    assert!(fixture.store.remove(tomorrow_of(START)).unwrap());
+
+    assert_eq!(fixture.store.scheduled_words(START).len(), 1);
+    let (_restarted_tei, restarted) = fixture.restarted_store().await;
+    restarted.load_schedule(START).await.unwrap();
+    assert_eq!(restarted.scheduled_words(START).len(), 1);
+    assert!(fixture.store.current_word(midnight_after(START)).is_none());
 }
 
 #[tokio::test]
 async fn saved_word_is_processed_again_after_a_restart() {
     let fixture = StoreFixture::new().await;
-    fixture.store.publish(first_puzzle(), START).await.unwrap();
+    fixture
+        .store
+        .publish(first_puzzle(), game_day(START), START)
+        .await
+        .unwrap();
     let (restarted_tei, restarted) = fixture.restarted_store().await;
 
-    restarted.load_saved_word(START + 100.0).await.unwrap();
+    restarted.load_schedule(START + 100.0).await.unwrap();
 
     assert_eq!(
         restarted.current_word(START + 100.0).unwrap().word.puzzle,
@@ -205,47 +322,72 @@ async fn saved_word_is_processed_again_after_a_restart() {
 }
 
 #[tokio::test]
-async fn restart_does_not_extend_the_day() {
+async fn schedule_survives_a_restart() {
     let fixture = StoreFixture::new().await;
-    fixture.store.publish(first_puzzle(), START).await.unwrap();
+    fixture
+        .store
+        .publish(first_puzzle(), game_day(START), START)
+        .await
+        .unwrap();
+    fixture
+        .store
+        .publish(second_puzzle(), tomorrow_of(START), START)
+        .await
+        .unwrap();
     let (_restarted_tei, restarted) = fixture.restarted_store().await;
-    restarted.load_saved_word(START + 100.0).await.unwrap();
-    assert!(restarted.current_word(START + WORD_TTL_SECONDS).is_none());
+
+    restarted.load_schedule(START + 100.0).await.unwrap();
+
+    let midnight = midnight_after(START);
+    assert_eq!(
+        restarted.current_word(midnight - 1.0).unwrap().word.puzzle,
+        first_puzzle()
+    );
+    assert_eq!(
+        restarted.current_word(midnight).unwrap().word.puzzle,
+        second_puzzle()
+    );
 }
 
 #[tokio::test]
-async fn word_that_expired_while_stopped_is_deleted_without_being_processed() {
+async fn word_whose_day_passed_while_stopped_is_deleted_without_being_processed() {
     let fixture = StoreFixture::new().await;
-    fixture.store.publish(first_puzzle(), START).await.unwrap();
-    let (restarted_tei, restarted) = fixture.restarted_store().await;
-
-    restarted
-        .load_saved_word(START + WORD_TTL_SECONDS)
+    fixture
+        .store
+        .publish(first_puzzle(), game_day(START), START)
         .await
         .unwrap();
+    let (restarted_tei, restarted) = fixture.restarted_store().await;
+    let midnight = midnight_after(START);
+
+    restarted.load_schedule(midnight).await.unwrap();
 
     assert!(restarted_tei.encoded_texts().is_empty());
-    assert!(restarted.current_word(START + WORD_TTL_SECONDS).is_none());
-    assert!(!fixture.word_file().exists());
+    assert!(restarted.current_word(midnight).is_none());
+    assert!(!fixture.schedule_file().exists());
 }
 
 #[tokio::test]
 async fn start_without_a_saved_word_leaves_the_store_empty() {
     let fixture = StoreFixture::new().await;
-    fixture.store.load_saved_word(START).await.unwrap();
+    fixture.store.load_schedule(START).await.unwrap();
     assert!(fixture.store.current_word(START).is_none());
 }
 
 #[tokio::test]
 async fn failed_upload_keeps_the_live_word() {
     let fixture = StoreFixture::new().await;
-    fixture.store.publish(first_puzzle(), START).await.unwrap();
+    fixture
+        .store
+        .publish(first_puzzle(), game_day(START), START)
+        .await
+        .unwrap();
     fixture.tei.set_mode(FakeTeiMode::Broken);
 
     assert!(
         fixture
             .store
-            .publish(second_puzzle(), START + 10.0)
+            .publish(second_puzzle(), game_day(START + 10.0), START + 10.0)
             .await
             .is_err()
     );
@@ -259,7 +401,10 @@ async fn failed_upload_keeps_the_live_word() {
             .puzzle,
         first_puzzle()
     );
-    assert_eq!(saved_puzzle(&fixture.word_file()), first_puzzle());
+    assert_eq!(
+        saved_puzzle(&fixture.schedule_file(), game_day(START)),
+        first_puzzle()
+    );
 }
 
 #[tokio::test]
@@ -270,7 +415,11 @@ async fn word_without_wrong_meanings_can_be_judged() {
         wrong_meanings: vec![],
         ..first_puzzle()
     };
-    fixture.store.publish(puzzle.clone(), START).await.unwrap();
+    fixture
+        .store
+        .publish(puzzle.clone(), game_day(START), START)
+        .await
+        .unwrap();
     let word = fixture.store.current_word(START).unwrap().word;
     let similarity = fixture
         .judge
@@ -283,7 +432,11 @@ async fn word_without_wrong_meanings_can_be_judged() {
 #[tokio::test]
 async fn old_word_stays_for_a_running_game_then_leaves_memory() {
     let fixture = StoreFixture::new().await;
-    fixture.store.publish(first_puzzle(), START).await.unwrap();
+    fixture
+        .store
+        .publish(first_puzzle(), game_day(START), START)
+        .await
+        .unwrap();
     let game = Game::new(
         fixture.store.current_word(START).unwrap().word,
         "0123456789abcdef".to_string(),
@@ -295,7 +448,7 @@ async fn old_word_stays_for_a_running_game_then_leaves_memory() {
 
     fixture
         .store
-        .publish(second_puzzle(), START + 10.0)
+        .publish(second_puzzle(), game_day(START + 10.0), START + 10.0)
         .await
         .unwrap();
     assert!(old_word.upgrade().is_some());
@@ -342,7 +495,11 @@ fn times_encoded(tei: &FakeTei, normalized_text: &str) -> usize {
 #[tokio::test]
 async fn repeated_guess_is_encoded_once() {
     let fixture = StoreFixture::new().await;
-    fixture.store.publish(first_puzzle(), START).await.unwrap();
+    fixture
+        .store
+        .publish(first_puzzle(), game_day(START), START)
+        .await
+        .unwrap();
     let word = fixture.store.current_word(START).unwrap().word;
 
     fixture
@@ -362,7 +519,11 @@ async fn repeated_guess_is_encoded_once() {
 #[tokio::test]
 async fn same_guess_sent_at_the_same_moment_is_encoded_once() {
     let fixture = StoreFixture::new().await;
-    fixture.store.publish(first_puzzle(), START).await.unwrap();
+    fixture
+        .store
+        .publish(first_puzzle(), game_day(START), START)
+        .await
+        .unwrap();
     let word = fixture.store.current_word(START).unwrap().word;
 
     let (first, second, third) = tokio::join!(
@@ -379,7 +540,11 @@ async fn same_guess_sent_at_the_same_moment_is_encoded_once() {
 #[tokio::test]
 async fn publishing_forgets_cached_guesses() {
     let fixture = StoreFixture::new().await;
-    fixture.store.publish(first_puzzle(), START).await.unwrap();
+    fixture
+        .store
+        .publish(first_puzzle(), game_day(START), START)
+        .await
+        .unwrap();
     let old_word = fixture.store.current_word(START).unwrap().word;
     fixture
         .judge
@@ -387,7 +552,11 @@ async fn publishing_forgets_cached_guesses() {
         .await
         .unwrap();
 
-    fixture.store.publish(second_puzzle(), START).await.unwrap();
+    fixture
+        .store
+        .publish(second_puzzle(), game_day(START), START)
+        .await
+        .unwrap();
     let new_word = fixture.store.current_word(START).unwrap().word;
     fixture
         .judge
@@ -399,13 +568,17 @@ async fn publishing_forgets_cached_guesses() {
 }
 
 #[tokio::test]
-async fn expiry_forgets_cached_guesses() {
+async fn new_day_forgets_cached_guesses() {
     let fixture = StoreFixture::new().await;
-    fixture.store.publish(first_puzzle(), START).await.unwrap();
+    fixture
+        .store
+        .publish(first_puzzle(), game_day(START), START)
+        .await
+        .unwrap();
     let word = fixture.store.current_word(START).unwrap().word;
     fixture.judge.similarity(&word, "bir tahmin").await.unwrap();
 
-    fixture.store.drop_expired_word(START + WORD_TTL_SECONDS);
+    fixture.store.drop_past_days(midnight_after(START));
     fixture.judge.similarity(&word, "bir tahmin").await.unwrap();
 
     assert_eq!(times_encoded(&fixture.tei, "bir tahmin"), 2);
@@ -414,7 +587,11 @@ async fn expiry_forgets_cached_guesses() {
 #[tokio::test]
 async fn failed_encoding_is_not_cached() {
     let fixture = StoreFixture::new().await;
-    fixture.store.publish(first_puzzle(), START).await.unwrap();
+    fixture
+        .store
+        .publish(first_puzzle(), game_day(START), START)
+        .await
+        .unwrap();
     let word = fixture.store.current_word(START).unwrap().word;
     fixture.tei.set_mode(FakeTeiMode::Overloaded);
     assert!(fixture.judge.similarity(&word, "bir tahmin").await.is_err());

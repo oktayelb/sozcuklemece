@@ -8,6 +8,7 @@ use axum::http::{HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
+use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use subtle::ConstantTimeEq;
@@ -15,7 +16,7 @@ use subtle::ConstantTimeEq;
 use crate::clock::Clock;
 use crate::config::Config;
 use crate::daily_word::{
-    DailyWordStore, MeaningSide, StoreError, game_day, moment_in_game_timezone,
+    DailyWordStore, MAX_DAYS_AHEAD, MeaningSide, StoreError, game_day, moment_in_game_timezone,
 };
 use crate::encoder::{EncoderError, TeiEncoder};
 use crate::entailment::EntailmentChecker;
@@ -62,7 +63,7 @@ impl AppState {
             judge = judge.with_entailment(EntailmentChecker::new(nli_url));
         }
         let judge = Arc::new(judge);
-        let word_store = DailyWordStore::new(judge.clone(), config.word_file.clone());
+        let word_store = DailyWordStore::new(judge.clone(), config.schedule_file.clone());
         let turnstile = TurnstileVerifier::new(
             config.turnstile_secret_key.clone(),
             config.turnstile_verify_url.clone(),
@@ -89,7 +90,7 @@ impl AppState {
     }
 
     pub fn remove_expired_state(&self) {
-        self.word_store.drop_expired_word(self.clock.unix_seconds());
+        self.word_store.drop_past_days(self.clock.unix_seconds());
         let mut games = self.games.lock().unwrap();
         let removed_games = remove_stale_games(&mut games, self.clock.monotonic_seconds());
         let mut players = self.players.lock().unwrap();
@@ -102,6 +103,7 @@ impl AppState {
 pub enum ApiError {
     GameNotFound,
     WordNotReady,
+    NoWordOnThatDay,
     AlreadyPlayed,
     TooManyRequests { seconds_to_wait: f64 },
     AdminDisabled,
@@ -139,6 +141,9 @@ impl From<StoreError> for ApiError {
             StoreError::ListFull => {
                 ApiError::InvalidInput("Bu liste dolu, eklenemedi.".to_string())
             }
+            StoreError::DayOutOfRange => ApiError::InvalidInput(format!(
+                "Yayın günü bugünden önce ya da {MAX_DAYS_AHEAD} günden ileri olamaz."
+            )),
         }
     }
 }
@@ -150,6 +155,10 @@ impl IntoResponse for ApiError {
             ApiError::WordNotReady => (
                 StatusCode::NOT_FOUND,
                 "Bugünün sözcüğü henüz hazır değil.".to_string(),
+            ),
+            ApiError::NoWordOnThatDay => (
+                StatusCode::NOT_FOUND,
+                "O güne kayıtlı sözcük yok.".to_string(),
             ),
             ApiError::AlreadyPlayed => (
                 StatusCode::CONFLICT,
@@ -293,9 +302,24 @@ struct TodayResponse {
 }
 
 #[derive(Serialize)]
+struct ScheduledWordResponse {
+    date: String,
+    word: String,
+}
+
+#[derive(Serialize)]
 struct WordStatusResponse {
+    today: String,
     word: Option<String>,
     expires_at: Option<String>,
+    scheduled: Vec<ScheduledWordResponse>,
+}
+
+#[derive(Deserialize)]
+struct PublishRequest {
+    #[serde(flatten)]
+    puzzle: Puzzle,
+    date: Option<NaiveDate>,
 }
 
 #[derive(Serialize)]
@@ -390,15 +414,33 @@ struct ReviewResponse {
 }
 
 fn word_status(state: &AppState) -> WordStatusResponse {
-    match state.word_store.current_word(state.clock.unix_seconds()) {
-        Some(live) => WordStatusResponse {
-            word: Some(live.word.puzzle.word.clone()),
-            expires_at: Some(moment_in_game_timezone(live.expires_at)),
-        },
-        None => WordStatusResponse {
-            word: None,
-            expires_at: None,
-        },
+    let now = state.clock.unix_seconds();
+    let mut scheduled = Vec::new();
+    for scheduled_word in state.word_store.scheduled_words(now) {
+        scheduled.push(ScheduledWordResponse {
+            date: scheduled_word.day.to_string(),
+            word: scheduled_word.word,
+        });
+    }
+    let mut status = WordStatusResponse {
+        today: game_day(now).to_string(),
+        word: None,
+        expires_at: None,
+        scheduled,
+    };
+    if let Some(live) = state.word_store.current_word(now) {
+        status.word = Some(live.word.puzzle.word.clone());
+        status.expires_at = Some(moment_in_game_timezone(live.expires_at));
+    }
+    status
+}
+
+fn parse_day(text: &str) -> Result<NaiveDate, ApiError> {
+    match NaiveDate::parse_from_str(text, "%Y-%m-%d") {
+        Ok(day) => Ok(day),
+        Err(_) => Err(ApiError::InvalidInput(
+            "Tarih YYYY-AA-GG biçiminde olmalı.".to_string(),
+        )),
     }
 }
 
@@ -438,18 +480,41 @@ fn too_long_definition_error() -> ApiError {
 async fn publish_word(
     _: AdminAccess,
     State(state): State<Arc<AppState>>,
-    Json(upload): Json<Puzzle>,
+    Json(upload): Json<PublishRequest>,
 ) -> Result<Json<WordStatusResponse>, ApiError> {
-    let puzzle = cleaned_upload(upload)?;
-    let published = state
-        .word_store
-        .publish(puzzle, state.clock.unix_seconds())
-        .await;
+    let puzzle = cleaned_upload(upload.puzzle)?;
+    let now = state.clock.unix_seconds();
+    let day = upload.date.unwrap_or(game_day(now));
+    let published = state.word_store.publish(puzzle, day, now).await;
     match published {
         Ok(()) => Ok(Json(word_status(&state))),
         Err(StoreError::Encoder(EncoderError::TooLong)) => Err(too_long_definition_error()),
         Err(error) => Err(ApiError::from(error)),
     }
+}
+
+async fn get_scheduled_word(
+    _: AdminAccess,
+    State(state): State<Arc<AppState>>,
+    Path(date): Path<String>,
+) -> Result<Json<Puzzle>, ApiError> {
+    let day = parse_day(&date)?;
+    match state.word_store.scheduled_puzzle(day) {
+        Some(puzzle) => Ok(Json(puzzle)),
+        None => Err(ApiError::NoWordOnThatDay),
+    }
+}
+
+async fn delete_scheduled_word(
+    _: AdminAccess,
+    State(state): State<Arc<AppState>>,
+    Path(date): Path<String>,
+) -> Result<Json<WordStatusResponse>, ApiError> {
+    let day = parse_day(&date)?;
+    if !state.word_store.remove(day)? {
+        return Err(ApiError::NoWordOnThatDay);
+    }
+    Ok(Json(word_status(&state)))
 }
 
 #[derive(Serialize)]
@@ -890,6 +955,10 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/api/today", get(get_today))
         .route("/api/admin/word", get(get_word_status).post(publish_word))
         .route("/api/admin/word/check", post(check_word))
+        .route(
+            "/api/admin/word/{date}",
+            get(get_scheduled_word).delete(delete_scheduled_word),
+        )
         .route("/api/players/{player_id}/today", get(get_player_today))
         .route("/api/games", post(start_game))
         .route("/api/games/{game_id}/hints", post(reveal_hint))

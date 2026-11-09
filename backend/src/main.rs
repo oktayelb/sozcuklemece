@@ -33,6 +33,15 @@ async fn clean_up_periodically(state: Arc<AppState>) {
     loop {
         interval.tick().await;
         state.remove_expired_state();
+        let prepared = state
+            .word_store
+            .prepare_upcoming_words(state.clock.unix_seconds())
+            .await;
+        if let Err(error) = prepared {
+            eprintln!(
+                "Sıradaki günün sözcüğü hazırlanamadı, bir dakika sonra yeniden denenecek: {error}"
+            );
+        }
     }
 }
 
@@ -55,15 +64,17 @@ async fn main() {
 
     let loaded = state
         .word_store
-        .load_saved_word(state.clock.unix_seconds())
+        .load_schedule(state.clock.unix_seconds())
         .await;
     match loaded {
         Ok(()) => {}
         Err(StoreError::Encoder(EncoderError::TooLong)) => {
-            eprintln!("Kayıtlı sözcüğün bir tanımı modelin sınırından uzun, sözcük yüklenmedi.");
+            eprintln!(
+                "Takvimdeki bir sözcüğün tanımı modelin sınırından uzun, o sözcük yüklenmedi."
+            );
         }
         Err(error) => {
-            eprintln!("Kayıtlı sözcük yüklenemedi: {error}");
+            eprintln!("Sözcük takvimi yüklenemedi: {error}");
             process::exit(1);
         }
     }

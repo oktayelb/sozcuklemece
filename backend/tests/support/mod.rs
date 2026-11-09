@@ -57,6 +57,10 @@ pub fn second_puzzle() -> Puzzle {
     load_sample_puzzles().remove(1)
 }
 
+pub const GAME_DAY: &str = "2026-11-06";
+pub const NEXT_GAME_DAY: &str = "2026-11-07";
+pub const SECONDS_FROM_NOON_TO_MIDNIGHT: f64 = 12.0 * 60.0 * 60.0;
+
 pub fn game_day_noon() -> f64 {
     Utc.with_ymd_and_hms(2026, 11, 6, 9, 0, 0)
         .unwrap()
@@ -327,12 +331,12 @@ pub struct TestServer {
     app: Router,
 }
 
-fn test_config(tei: &FakeTei, turnstile: &FakeTurnstile, word_file: PathBuf) -> Config {
+fn test_config(tei: &FakeTei, turnstile: &FakeTurnstile, schedule_file: PathBuf) -> Config {
     Config {
         bind_address: "127.0.0.1:0".to_string(),
         tei_url: tei.url.clone(),
         nli_url: None,
-        word_file,
+        schedule_file,
         admin_token: Some(ADMIN_TOKEN.to_string()),
         client_ip_header: Some(axum::http::HeaderName::from_static(CLIENT_IP_HEADER)),
         turnstile_site_key: TURNSTILE_SITE_KEY.to_string(),
@@ -374,8 +378,8 @@ impl TestServer {
         clock: Clock,
         adjust: impl Fn(&mut Config),
     ) -> TestServer {
-        let word_file = data_directory.path().join("current_word.json");
-        let mut config = test_config(&tei, &turnstile, word_file);
+        let schedule_file = data_directory.path().join("schedule.json");
+        let mut config = test_config(&tei, &turnstile, schedule_file);
         adjust(&mut config);
         let state = Arc::new(AppState::new(config, clock));
         let app = router(state.clone());
@@ -399,14 +403,14 @@ impl TestServer {
         server
             .state
             .word_store
-            .load_saved_word(server.state.clock.unix_seconds())
+            .load_schedule(server.state.clock.unix_seconds())
             .await
             .unwrap();
         server
     }
 
-    pub fn word_file(&self) -> PathBuf {
-        self.data_directory.path().join("current_word.json")
+    pub fn schedule_file(&self) -> PathBuf {
+        self.data_directory.path().join("schedule.json")
     }
 
     pub fn advance_clock(&self, seconds: f64) {
@@ -491,6 +495,35 @@ impl TestServer {
     pub async fn publish(&self, puzzle: &Puzzle) -> ApiResponse {
         self.publish_with_token(&serde_json::to_value(puzzle).unwrap(), Some(ADMIN_TOKEN))
             .await
+    }
+
+    pub async fn publish_on(&self, puzzle: &Puzzle, date: &str) -> ApiResponse {
+        let mut body = serde_json::to_value(puzzle).unwrap();
+        body["date"] = Value::String(date.to_string());
+        self.publish_with_token(&body, Some(ADMIN_TOKEN)).await
+    }
+
+    pub async fn admin_get(&self, path: &str) -> ApiResponse {
+        self.call(Method::GET, path, None, &[("x-admin-token", ADMIN_TOKEN)])
+            .await
+    }
+
+    pub async fn admin_delete(&self, path: &str) -> ApiResponse {
+        self.call(
+            Method::DELETE,
+            path,
+            None,
+            &[("x-admin-token", ADMIN_TOKEN)],
+        )
+        .await
+    }
+
+    pub async fn prepare_upcoming_words(&self) {
+        self.state
+            .word_store
+            .prepare_upcoming_words(self.state.clock.unix_seconds())
+            .await
+            .unwrap();
     }
 
     pub async fn start_game_as(&self, player_id: &str, token: &str) -> ApiResponse {

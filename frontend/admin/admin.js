@@ -1,3 +1,4 @@
+const MAX_DAYS_AHEAD = 90;
 const TEXT_FIELDS = ["word", "definition", "parts", "sentence", "category", "field"];
 const LIST_FIELDS = [
   "also_accepted",
@@ -73,17 +74,129 @@ function formatMoment(isoMoment) {
   return moment.toLocaleString("tr-TR", { dateStyle: "long", timeStyle: "short", timeZone: "Europe/Istanbul" });
 }
 
+function addDays(isoDate, days) {
+  const date = new Date(`${isoDate}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function formatDay(isoDate) {
+  const date = new Date(`${isoDate}T12:00:00Z`);
+  return date.toLocaleDateString("tr-TR", { day: "numeric", month: "long", weekday: "long", timeZone: "UTC" });
+}
+
 function describeStatus(status) {
   if (status.word === null) {
-    return "Şu an yayında sözcük yok.";
+    return "Bugün için sözcük yok, oyun kapalı.";
   }
-  return `Yayında: ${status.word}. Silinme zamanı: ${formatMoment(status.expires_at)}.`;
+  return `Bugün yayında: ${status.word}. Bitiş: ${formatMoment(status.expires_at)}.`;
+}
+
+function firstFreeDay(status) {
+  const takenDays = status.scheduled.map((item) => item.date);
+  let day = status.today;
+  while (takenDays.includes(day)) {
+    day = addDays(day, 1);
+  }
+  return day;
+}
+
+function describeSchedule(status) {
+  if (status.scheduled.length === 0) {
+    return "Takvimde sözcük yok.";
+  }
+  const lastDay = status.scheduled[status.scheduled.length - 1].date;
+  const freeDay = firstFreeDay(status);
+  if (freeDay > lastDay) {
+    return `Takvim ${formatDay(lastDay)} gününe kadar dolu.`;
+  }
+  return `İlk boş gün: ${formatDay(freeDay)}. O gün oyun kapalı kalır.`;
+}
+
+function fillWordForm(puzzle) {
+  const fields = element("word-form").elements;
+  for (const name of TEXT_FIELDS) {
+    fields[name].value = puzzle[name];
+  }
+  for (const name of LIST_FIELDS) {
+    fields[name].value = puzzle[name].join("\n");
+  }
+}
+
+async function editScheduledWord(date) {
+  const message = element("schedule-message");
+  try {
+    const puzzle = await callAdminApi("GET", `/api/admin/word/${date}`);
+    fillWordForm(puzzle);
+    element("word-form").elements.date.value = date;
+    element("check-report").hidden = true;
+    element("form-message").textContent = `${formatDay(date)} günündeki ${puzzle.word} düzenleniyor. Değişiklikler yeniden yayınlayınca kaydedilir.`;
+    element("word-form").scrollIntoView({ behavior: "smooth" });
+  } catch (error) {
+    message.textContent = error.message;
+  }
+}
+
+async function deleteScheduledWord(item) {
+  if (!window.confirm(`${formatDay(item.date)} günündeki ${item.word} silinsin mi?`)) {
+    return;
+  }
+  try {
+    renderStatus(await callAdminApi("DELETE", `/api/admin/word/${item.date}`));
+  } catch (error) {
+    element("schedule-message").textContent = error.message;
+  }
+}
+
+function buildScheduleButton(label, action) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "check-move";
+  button.textContent = label;
+  button.addEventListener("click", action);
+  return button;
+}
+
+function buildScheduleRow(item, today) {
+  const row = document.createElement("li");
+  row.className = "schedule-row";
+
+  const day = document.createElement("span");
+  day.className = "schedule-day";
+  day.textContent = item.date === today ? `Bugün, ${formatDay(item.date)}` : formatDay(item.date);
+
+  const word = document.createElement("span");
+  word.className = "check-text";
+  word.textContent = item.word;
+
+  const actions = document.createElement("span");
+  actions.className = "schedule-actions";
+  actions.append(
+    buildScheduleButton("Düzenle", () => editScheduledWord(item.date)),
+    buildScheduleButton("Sil", () => deleteScheduledWord(item)),
+  );
+
+  row.append(day, word, actions);
+  return row;
+}
+
+function renderStatus(status) {
+  element("word-status").textContent = describeStatus(status);
+  element("schedule-message").textContent = describeSchedule(status);
+  const rows = status.scheduled.map((item) => buildScheduleRow(item, status.today));
+  element("schedule-list").replaceChildren(...rows);
+
+  const dateInput = element("word-form").elements.date;
+  dateInput.min = status.today;
+  dateInput.max = addDays(status.today, MAX_DAYS_AHEAD);
+  if (dateInput.value === "" || dateInput.value < status.today) {
+    dateInput.value = firstFreeDay(status);
+  }
 }
 
 async function refreshStatus() {
   try {
-    const status = await callAdminApi("GET", "/api/admin/word");
-    element("word-status").textContent = describeStatus(status);
+    renderStatus(await callAdminApi("GET", "/api/admin/word"));
   } catch (error) {
     element("word-status").textContent = error.message;
   }
@@ -93,12 +206,21 @@ async function publishWord(event) {
   event.preventDefault();
   const button = element("publish-button");
   const message = element("form-message");
+  const form = element("word-form");
+  const word = readWordForm();
+  word.date = form.elements.date.value;
   button.disabled = true;
   message.textContent = "";
   try {
-    const status = await callAdminApi("POST", "/api/admin/word", readWordForm());
-    element("word-status").textContent = describeStatus(status);
-    message.textContent = `${status.word} yayınlandı.`;
+    const status = await callAdminApi("POST", "/api/admin/word", word);
+    form.reset();
+    element("check-report").hidden = true;
+    renderStatus(status);
+    if (word.date === status.today) {
+      message.textContent = `${word.word} yayınlandı, şimdi oyunda.`;
+    } else {
+      message.textContent = `${word.word}, ${formatDay(word.date)} için takvime eklendi.`;
+    }
   } catch (error) {
     message.textContent = error.message;
   } finally {

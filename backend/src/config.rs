@@ -8,13 +8,13 @@ use crate::turnstile::SITEVERIFY_URL;
 
 const DEFAULT_BIND_ADDRESS: &str = "0.0.0.0:8000";
 const DEFAULT_TEI_URL: &str = "http://127.0.0.1:8080";
-const DEFAULT_WORD_FILE: &str = "data/current_word.json";
+const DEFAULT_SCHEDULE_FILE: &str = "data/schedule.json";
 
 pub struct Config {
     pub bind_address: String,
     pub tei_url: String,
     pub nli_url: Option<String>,
-    pub word_file: PathBuf,
+    pub schedule_file: PathBuf,
     pub admin_token: Option<String>,
     pub client_ip_header: Option<HeaderName>,
     pub turnstile_site_key: String,
@@ -50,8 +50,8 @@ impl Config {
             bind_address: variable("BIND_ADDRESS").unwrap_or(DEFAULT_BIND_ADDRESS.to_string()),
             tei_url: variable("TEI_URL").unwrap_or(DEFAULT_TEI_URL.to_string()),
             nli_url: variable("NLI_URL"),
-            word_file: PathBuf::from(
-                variable("WORD_FILE").unwrap_or(DEFAULT_WORD_FILE.to_string()),
+            schedule_file: PathBuf::from(
+                variable("SCHEDULE_FILE").unwrap_or(DEFAULT_SCHEDULE_FILE.to_string()),
             ),
             admin_token: variable("ADMIN_TOKEN"),
             client_ip_header,

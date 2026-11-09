@@ -42,7 +42,7 @@ Pi'de tek `ai` kopyası yeterli: `compose.yaml` içinden `ai-2`'yi çıkar ve `T
 
 `.env` dosyasında `ADMIN_TOKEN`'ı uzun, rastgele bir parolayla, `ADMIN_PATH`'i tahmin edilemeyen bir yolla (yalnız harf, rakam ve tire) değiştir. Bu dosya depoya girmez, Compose onu kendiliğinden okur.
 
-Ardından http://127.0.0.1:8000 adresini aç. İlk derleme modeli indirip ONNX'e çevirdiği için birkaç dakika sürer. Günün sözcüğü `word-data` biriminde durur, yeniden başlatmada kaybolmaz.
+Ardından http://127.0.0.1:8000 adresini aç. İlk derleme modeli indirip ONNX'e çevirdiği için birkaç dakika sürer. Sözcük takvimi `word-data` biriminde durur, yeniden başlatmada kaybolmaz.
 
 Açılış sırası: iki `ai` kopyası ve `nli` sağlıklı olunca `backend`, `backend` hazır olunca `frontend` başlar. `backend` kayıtlı sözcüğü yükleyene kadar istek kabul etmez. nginx arka ucun adresini 10 saniyede bir yeniden çözer, bu yüzden yalnızca `backend` yeniden kurulduğunda da ön yüz çalışmaya devam eder.
 
@@ -54,7 +54,7 @@ Arka ucu kapsayıcı dışında çalıştırmak için:
     set -a && . ../.env && set +a
     cargo run --release
 
-Arka uç `TEI_URL` (varsayılan `http://127.0.0.1:8080`, birden çok kopya için virgülle ayrılır), `NLI_URL` (boşsa çıkarım denetimi kapalı), `BIND_ADDRESS` (varsayılan `0.0.0.0:8000`) ve `WORD_FILE` (varsayılan `data/current_word.json`) ortam değişkenlerini okur.
+Arka uç `TEI_URL` (varsayılan `http://127.0.0.1:8080`, birden çok kopya için virgülle ayrılır), `NLI_URL` (boşsa çıkarım denetimi kapalı), `BIND_ADDRESS` (varsayılan `0.0.0.0:8000`) ve `SCHEDULE_FILE` (varsayılan `data/schedule.json`) ortam değişkenlerini okur.
 
 Testler: `cd backend && cargo test`
 
@@ -76,17 +76,19 @@ Eşiğe yaklaşıp (yakınlık %70 ve üstü) kazanamayan tahminler ve oyuncular
 
 nginx ön yüz dosyalarını önbellek başlıklarıyla sunar: HTML, JS ve CSS 5 dakika, yazı tipleri ve sesler 30 gün. `/api/` yanıtları hiç önbelleğe alınmaz. Önüne bir CDN (ör. Cloudflare) konursa nginx'e `set_real_ip_from` ve `real_ip_header` eklenmeli, yoksa bütün oyuncular CDN'in IP'si sayılır.
 
-## Günün sözcüğünü yükleme
+## Sözcük takvimi
 
-`/<ADMIN_PATH>/` sayfasını aç, `ADMIN_TOKEN` parolasını gir, formu doldurup yayınla. `ADMIN_TOKEN` ayarlı değilse yükleme kapalıdır. Parola düz metin gittiği için canlıda HTTPS kullan. Depo herkese açık olduğundan yönetici sayfasının yolu kodda değil `.env` içindedir. Gizli yol yalnızca sayfayı saklar, asıl koruma parola ve `/api/admin/` isteklerinin istek sınırıdır.
+`/<ADMIN_PATH>/` sayfasını aç, `ADMIN_TOKEN` parolasını gir, yayın gününü seçip formu doldur ve yayınla. `ADMIN_TOKEN` ayarlı değilse yükleme kapalıdır. Parola düz metin gittiği için canlıda HTTPS kullan. Depo herkese açık olduğundan yönetici sayfasının yolu kodda değil `.env` içindedir. Gizli yol yalnızca sayfayı saklar, asıl koruma parola ve `/api/admin/` isteklerinin istek sınırıdır.
 
 - Sözcüğün işlenmiş hali yüklenirken hazırlanır ve bellekte durur, tahminlerde yeniden hesaplanmaz.
 - Yayınlamadan önce "Deneme tahminleri" bölümüne oyuncuların yazabileceği tahminleri yazıp "Dene"ye bas. Sayfa hangilerinin yanlış değerlendirildiğini gösterir, yanlış değerlendirileni tek tıkla doğru anlatımlara ya da yanlış anlamlara taşırsın.
 - Kazanmaması gereken bir deneme tahmini eşiği geçerse o sözcüğün kazanma eşiği onun 0,02 üstüne çıkar (en çok 0,70). Eşik hiç düşmez: örnek tahminlerle yapılan denemede eşiği düşürmek doğru tahminleri artırdı ama yanlış tahminlerin %2-3'ünü de kazandırdı.
 - Zıt anlamlar ve yanlış anlamlar ayrı listelerdir. İkisi de kazanmayı zorlaştırır. Tahmin bunlardan birine doğru anlamlardan daha yakınsa oyuncu "Tersini söylüyor gibisin" ya da "Konu yakın, anlam başka" notunu görür.
-- Yeni sözcük hemen oyuna girer, önceki sözcük bellekten ve diskten silinir. O sırada süren oyunlar kendi sözcükleriyle biter.
-- Sözcük yüklendikten 24 saat sonra kendiliğinden silinir. Yenisi yüklenene kadar oyun başlatılamaz.
-- Sunucu yeniden başlarsa sözcük `WORD_FILE` dosyasından okunup yeniden hazırlanır. Bu dosya depoya girmez.
+- Sözcükler en çok 90 gün ilerisi için önceden takvime eklenebilir. Her sözcük kendi gününün gece yarısında (Türkiye saati) oyuna girer, ertesi gece yarısı bellekten ve diskten silinir. Sayfa takvimi gösterir, her gün düzenlenebilir ya da silinebilir.
+- Ertesi günün sözcüğü bir gün önceden hazırlanır, gece yarısı geçiş anında olur. Hazırlık dakikada bir denenir, yapay zekâ sunucusu o an çalışmıyorsa sonraki denemede yapılır.
+- Bugüne yayınlanan sözcük hemen oyuna girer ve bugünkü sözcüğün yerini alır. O sırada süren oyunlar kendi sözcükleriyle biter.
+- Takvimde boş kalan gün oyun kapalıdır.
+- Takvim `SCHEDULE_FILE` dosyasında durur, sunucu yeniden başlarsa bugünün ve yarının sözcüğü yeniden hazırlanır. Bu dosya depoya girmez.
 - Tahminlerin vektörleri en çok 1000 tahminlik bir önbellekte tutulur, az kullanılanlar yenilerine yer açar. Aynı anda gelen aynı tahmin modele bir kez gider. Sözcük değişince ya da süresi dolunca önbellek boşaltılır.
 
 Doğruluğu örnek sözcüklerle ölçmek için yapay zekâ sunucusu açıkken `backend` klasöründe:
